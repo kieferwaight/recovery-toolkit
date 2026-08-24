@@ -46,5 +46,10 @@ done
 grep -Fq 'DRY_RUN=1' "${repo_dir}/bin/provision-luks" || fail 'default dry-run missing'
 grep -Fq 'require_audit_vault' "${repo_dir}/bin/provision-luks" || fail 'audit gate missing'
 grep -Fq 'confirm_destructive' "${repo_dir}/bin/provision-luks" || fail 'destructive confirmation missing'
+grep -Fq 'mktemp /dev/shm/recovery-luks-key' "${repo_dir}/bin/provision-luks" || fail 'RAM key path missing'
+grep -Fq 'dd if=/dev/urandom' "${repo_dir}/bin/provision-luks" || fail 'CSPRNG key generation missing'
+grep -Fq 'luksHeaderBackup' "${repo_dir}/bin/provision-luks" || fail 'header backup missing'
+grep -Fq 'sha256sum' "${repo_dir}/bin/provision-luks" || fail 'checksums missing'
+grep -Fq 'trap ' "${repo_dir}/bin/provision-luks" || fail 'temporary key cleanup missing'
 
 printf '%s\n' 'provision profile tests: pass'

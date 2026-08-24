@@ -38,6 +38,19 @@ encrypted vault, and keep the OS USB free of long-lived cleartext key material.
 stable target identity and refuses the active recovery USB. The mutating path
 will remain behind the vault audit gate and explicit identity confirmation.
 
+Use the following sequence during a maintenance session:
+
+```bash
+sudo setup-vault
+sudo inspect-disk /dev/disk/by-id/<target>
+sudo provision-luks --target /dev/disk/by-id/<target>
+```
+
+Review the fingerprint and planned commands first. The future mutating path
+will require the vault to be mounted, the target fingerprint to be re-read and
+confirmed, and the explicit `NUKE` confirmation. Never use `/dev/sdX` as the
+operator-facing target identifier.
+
 link to 
 [Hdd Secure Erase](./hdd-secure-erase.md)
 [SSD Secure Erase](./ssd-secure-erase.md)

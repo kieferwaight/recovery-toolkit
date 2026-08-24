@@ -52,6 +52,17 @@ assert_block_device "${TARGET_DISK}"
 assert_not_boot_disk "${TARGET_DISK}"
 metadata="$(disk_identity "${TARGET_DISK}")"
 fingerprint="$(disk_identity_fingerprint "${metadata}")"
+vault_device=''
+if [[ -n "${VAULT_UUID:-}" ]]; then
+  vault_device="$(readlink -f "/dev/disk/by-uuid/${VAULT_UUID}" 2>/dev/null || true)"
+fi
+target_real="$(readlink -f "${TARGET_DISK}")"
+target_parent="$(lsblk -no PKNAME "${target_real}" 2>/dev/null || true)"
+vault_parent="$(lsblk -no PKNAME "${vault_device}" 2>/dev/null || true)"
+if [[ -n "${vault_device}" && ( "${target_real}" == "${vault_device}" || ( -n "${target_parent}" && "${target_parent}" == "${vault_parent}" ) ) ]]; then
+  log_error 'Safety violation: target is the configured vault device.'
+  exit 2
+fi
 
 printf 'host_id=%s\n' "${HOST_ID}"
 printf 'target_fingerprint=%s\n' "${fingerprint}"
@@ -77,5 +88,75 @@ fi
 
 require_audit_vault
 confirm_destructive "${TARGET_DISK}"
-log_error 'Destructive provisioning is not enabled in this slice.'
-exit 3
+metadata_confirm="$(disk_identity "${TARGET_DISK}")"
+fingerprint_confirm="$(disk_identity_fingerprint "${metadata_confirm}")"
+if [[ "${fingerprint_confirm}" != "${fingerprint}" ]]; then
+  log_error 'Target identity changed after confirmation; refusing provisioning.'
+  exit 2
+fi
+read -rp "Type target fingerprint '${fingerprint}' to authorize provisioning: " fingerprint_response
+if [[ "${fingerprint_response}" != "${fingerprint}" ]]; then
+  log_info 'Provisioning canceled: target fingerprint did not match.'
+  exit 0
+fi
+
+if [[ "$(findmnt -n -o FSTYPE /dev/shm 2>/dev/null || true)" != 'tmpfs' ]]; then
+  log_error '/dev/shm is not a tmpfs; refusing to create a temporary LUKS key.'
+  exit 1
+fi
+
+audit_begin 'provision-luks' "${TARGET_DISK}" "${metadata_confirm}"
+provision_root="${AUDIT_ROOT}/hosts/${HOST_ID}/provisioning/${AUDIT_OPERATION_ID}"
+mkdir -p "${provision_root}/luks" "${provision_root}/manifests"
+umask 077
+key_file="$(mktemp /dev/shm/recovery-luks-key.XXXXXX)"
+header_file="${provision_root}/luks/luks-header.img"
+trap 'rm -f "${key_file}"; if [[ -n "${mapper_open:-}" ]]; then cryptsetup close "${mapper_name}" 2>/dev/null || true; fi' EXIT
+dd if=/dev/urandom of="${key_file}" bs=64 count=1 status=none
+chmod 600 "${key_file}"
+cp --preserve=mode "${key_file}" "${provision_root}/luks/luks.key"
+
+mapper_name="recovery-${HOST_ID}-luks"
+mapper_open=''
+run_provision() {
+  local luks_partition
+  wipefs --all "${TARGET_DISK}" || return $?
+  sgdisk --zap-all --clear "${TARGET_DISK}" || return $?
+  sgdisk --new=1:0:+"${EFI_SIZE}" --typecode=1:ef00 --change-name=1:EFI "${TARGET_DISK}" || return $?
+  sgdisk --new=2:0:+"${BOOT_SIZE}" --typecode=2:8300 --change-name=2:BOOT "${TARGET_DISK}" || return $?
+  sgdisk --new=3:0:0 --typecode=3:8e00 --change-name=3:CRYPTROOT "${TARGET_DISK}" || return $?
+  partprobe "${TARGET_DISK}" || return $?
+  luks_partition="$(lsblk -nrpo NAME,PARTN "${TARGET_DISK}" | awk '$2 == 3 { print $1; exit }')"
+  [[ -b "${luks_partition}" ]] || return 1
+  cryptsetup luksFormat --batch-mode --type luks2 --cipher "${LUKS_CIPHER}" --key-size "${LUKS_KEY_SIZE}" --pbkdf "${LUKS_PBKDF}" --key-file "${key_file}" "${luks_partition}" || return $?
+  cryptsetup open --key-file "${key_file}" "${luks_partition}" "${mapper_name}" || return $?
+  mapper_open=1
+  pvcreate "/dev/mapper/${mapper_name}" || return $?
+  vgcreate "${ROOT_VG}" "/dev/mapper/${mapper_name}" || return $?
+  lvcreate --yes --name "${ROOT_LV}" --extents 100%FREE "${ROOT_VG}" || return $?
+  mkfs.xfs -f -L "${ROOT_FS_LABEL}" "/dev/${ROOT_VG}/${ROOT_LV}" || return $?
+  cryptsetup luksHeaderBackup "${luks_partition}" --header-backup-file "${header_file}" || return $?
+  luks_uuid="$(cryptsetup luksUUID "${luks_partition}")" || return $?
+  root_uuid="$(blkid -s UUID -o value "/dev/${ROOT_VG}/${ROOT_LV}")" || return $?
+  key_sha256="$(sha256sum "${key_file}" | awk '{print $1}')" || return $?
+  header_sha256="$(sha256sum "${header_file}" | awk '{print $1}')" || return $?
+  printf 'host_id=%s\ntarget_fingerprint=%s\nluks_uuid=%s\nroot_filesystem_uuid=%s\nkey_sha256=%s\nheader_sha256=%s\n' \
+    "${HOST_ID}" "${fingerprint}" "${luks_uuid}" "${root_uuid}" "${key_sha256}" "${header_sha256}" >"${provision_root}/manifests/provisioning.env"
+  sync
+}
+
+set +e
+run_provision
+provision_status=$?
+set -e
+if [[ -n "${mapper_open:-}" ]]; then
+  vgchange -an "${ROOT_VG}" 2>/dev/null || true
+  cryptsetup close "${mapper_name}" 2>/dev/null || true
+  mapper_open=''
+fi
+audit_finish "${provision_status}"
+if ((provision_status != 0)); then
+  log_error "LUKS provisioning failed with status ${provision_status}."
+  exit "${provision_status}"
+fi
+log_info "LUKS2/LVM/XFS provisioning completed for ${HOST_ID}."
