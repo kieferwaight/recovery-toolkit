@@ -18,6 +18,15 @@ assert_contains "${repo_dir}/bin/setup-tailscale" 'tailscale up --qr=false --tim
 assert_contains "${repo_dir}/bin/setup-tailscale" 'login'
 assert_contains "${repo_dir}/README.md" "- \`setup-ssh\` - enables SSH and authorizes GitHub public keys"
 assert_contains "${repo_dir}/README.md" "- \`setup-tailscale\` - installs and authorizes Tailscale"
+assert_contains "${repo_dir}/bin/optimize-usb" 'backup_dir="/root/recovery-toolkit-optimization-'
+assert_contains "${repo_dir}/bin/optimize-usb" 'apt-get purge -y snapd'
+assert_contains "${repo_dir}/bin/optimize-usb" 'vm.dirty_background_bytes = 67108864'
+assert_contains "${repo_dir}/bin/optimize-usb" 'tmpfs /var/cache/apt'
+assert_contains "${repo_dir}/bin/optimize-usb" 'commit=60'
+if grep -Fq 'systemctl mask' "${repo_dir}/bin/optimize-usb"; then
+  echo "optimizer must not mask services" >&2
+  exit 1
+fi
 
 tmp_dir="$(mktemp -d)"
 had_env=false

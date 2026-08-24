@@ -40,5 +40,17 @@ sudo setup-tailscale
 without duplicating existing entries. `setup-tailscale` installs and enables
 Tailscale; when authorization is needed, it prints the browser URL to open.
 
+For a RAM-first utility profile, run:
+
+```bash
+sudo optimize-usb
+```
+
+This creates a rollback snapshot under `/root`, removes unused snap support,
+disables background update/telemetry services, moves temporary paths into
+tmpfs, disables swap, and bounds delayed writeback. The profile prioritizes
+interactive performance and USB wear reduction over persistence; the root
+filesystem may lose up to 60 seconds of recent writes after sudden power loss.
+
 See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
 LUKS key/header storage and disk identification.
