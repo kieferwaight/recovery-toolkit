@@ -1,0 +1,27 @@
+#!/usr/bin/env bash\
+#TODO Tie into common.sh and .env for USB UUID locking and recovery-toolkit path
+set -euo pipefail
+
+TARGET="${1:-}"
+
+if [[ -z "$TARGET" || "$TARGET" == "-h" || "$TARGET" == "--help" ]]; then
+  echo "Usage: sudo nvme-secure-erase /dev/nvmeXn1"
+  echo "Issues a cryptographic scramble or user-data sanitize via nvme-cli."
+  exit 1
+fi
+
+if [[ "$EUID" -ne 0 ]]; then
+  echo "Error: Must be run as root." >&2
+  exit 1
+fi
+
+echo "Targeting: $TARGET"
+sudo nvme id-ctrl "$TARGET" -H | grep -i sanitize || true
+
+read -rp "Are you SURE you want to irreversibly sanitize $TARGET? (type 'DESTROY'): " CONFIRM
+if [[ "$CONFIRM" != "DESTROY" ]]; then
+  echo "Aborted."
+  exit 1
+fi
+
+nvme format "$TARGET" --namespace-id=1 --ses=1

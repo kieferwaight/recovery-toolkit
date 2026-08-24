@@ -1,0 +1,27 @@
+# Disk wiping, sanitize, and partitioning
+cryptsetup
+nvme-cli
+hdparm
+smartmontools
+gdisk
+wipefs
+parted
+dosfstools
+e2fsprogs
+xfsprogs
+
+# Utilities & Imaging
+pv
+pigz
+ddrescue
+testdisk
+lsof
+tree
+
+# Hardware Tokens & Smart Cards
+yubikey-manager
+libfido2-doc
+fido2-tools
+tpm2-tools
+pcscd
+scdaemon
