@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+
+require_root
+load_env
+
+REAL_USER="${SUDO_USER:-${USER}}"
+USER_HOME="$(getent passwd "${REAL_USER}" | cut -d: -f6)"
+if [[ -z "${USER_HOME}" ]]; then
+  log_error "Could not determine home directory for ${REAL_USER}."
+  exit 1
+fi
+
+if ! command -v sshd >/dev/null 2>&1; then
+  log_info "Installing OpenSSH server..."
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get install -y --no-install-recommends openssh-server
+fi
+
+if systemctl list-unit-files ssh.service >/dev/null 2>&1; then
+  SSH_SERVICE=ssh
+elif systemctl list-unit-files sshd.service >/dev/null 2>&1; then
+  SSH_SERVICE=sshd
+else
+  log_error "Could not find an OpenSSH systemd service."
+  exit 1
+fi
+systemctl enable --now "${SSH_SERVICE}"
+
+authorized_keys="${AUTHORIZED_KEYS_FILE:-${USER_HOME}/.ssh/authorized_keys}"
+install -d -m 0700 "$(dirname "${authorized_keys}")"
+touch "${authorized_keys}"
+chmod 0600 "${authorized_keys}"
+chown "${REAL_USER}:$(id -gn "${REAL_USER}")" "$(dirname "${authorized_keys}")" "${authorized_keys}"
+
+KEYS_URL="${GITHUB_KEYS_URL:-https://github.com/kieferwaight.keys}"
+key_file="$(mktemp)"
+trap 'rm -f "${key_file}"' EXIT
+curl -fsSL --location "${KEYS_URL}" -o "${key_file}"
+
+added=0
+while IFS= read -r key || [[ -n "${key}" ]]; do
+  [[ -z "${key}" || "${key}" == \#* ]] && continue
+  if ! ssh-keygen -lf <(printf '%s\n' "${key}") >/dev/null 2>&1; then
+    log_warn "Skipping an invalid public key from ${KEYS_URL}."
+    continue
+  fi
+  if ! grep -Fqx -- "${key}" "${authorized_keys}"; then
+    printf '%s\n' "${key}" >> "${authorized_keys}"
+    added=$((added + 1))
+  fi
+done < "${key_file}"
+
+chown "${REAL_USER}:$(id -gn "${REAL_USER}")" "${authorized_keys}"
+log_info "SSH is enabled; added ${added} new GitHub public key(s) for ${REAL_USER}."

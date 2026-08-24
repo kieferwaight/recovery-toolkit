@@ -37,3 +37,7 @@ hooks:
 check:
 	@echo "==> Running shellcheck on shell scripts..."
 	shellcheck -x -P lib bin/* lib/*.sh packages/*.sh bootstrap.sh
+
+test:
+	@echo "==> Running setup command tests..."
+	./tests/test_setup_commands.sh

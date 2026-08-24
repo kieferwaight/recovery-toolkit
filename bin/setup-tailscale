@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+
+require_root
+load_env
+
+if ! command -v tailscale >/dev/null 2>&1; then
+  log_info "Installing Tailscale..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+
+if ! command -v tailscale >/dev/null 2>&1; then
+  log_error "Tailscale installation did not provide the tailscale command."
+  exit 1
+fi
+
+systemctl enable --now tailscaled
+
+status_json="$(tailscale status --json 2>/dev/null || true)"
+if grep -q '"BackendState"[[:space:]]*:[[:space:]]*"Running"' <<<"${status_json}"; then
+  log_info "Tailscale is already authenticated and running."
+  exit 0
+fi
+
+log_info "Tailscale needs authorization. A browser URL will be printed if available."
+set +e
+up_output="$(tailscale up --qr=false --timeout=10s 2>&1)"
+up_status=$?
+set -e
+printf '%s\n' "${up_output}"
+
+auth_url="$(printf '%s\n' "${up_output}" | grep -Eo 'https://login\.tailscale\.com[^[:space:]]*' | head -n1 || true)"
+if [[ -n "${auth_url}" ]]; then
+  printf 'Authorize Tailscale here: %s\n' "${auth_url}"
+  log_info "Rerun setup-tailscale after authorization to confirm the connection."
+  exit 0
+fi
+
+if [[ "${up_status}" -ne 0 ]]; then
+  log_error "Tailscale authentication failed and did not provide an authorization URL."
+  exit "${up_status}"
+fi
+
+log_info "Tailscale authentication completed."
