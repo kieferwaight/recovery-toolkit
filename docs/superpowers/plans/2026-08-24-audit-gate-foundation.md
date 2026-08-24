@@ -1,6 +1,6 @@
 # Audit Gate Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add validated recovery-network profiles and a vault-backed, fail-closed audit gate for destructive disk commands.
 
@@ -33,7 +33,7 @@
 - Consumes: `.env` values loaded by `load_env`.
 - Produces: `load_recovery_profile`, `validate_recovery_profile`, and exported variables `RECOVERY_INTERFACE`, `RECOVERY_GATEWAY`, `RECOVERY_HOST_IP`, `RECOVERY_SUBNET`, `RECOVERY_SSH_PORT`, and optional `RECOVERY_CLIENT_CIDR`.
 
-- [ ] **Step 1: Write failing profile tests**
+- [x] **Step 1: Write failing profile tests**
 
 Create a temporary environment fixture and test that a valid profile passes, a
 host address outside the subnet fails, a gateway outside the subnet fails, an
@@ -41,7 +41,7 @@ invalid port fails, and a missing interface fails only when live validation is
 requested. Use shell functions and temporary files; do not require root or a
 network device for syntax-only tests.
 
-- [ ] **Step 2: Run the profile tests and verify failure**
+- [x] **Step 2: Run the profile tests and verify failure**
 
 Run:
 
@@ -52,7 +52,7 @@ bash tests/test_recovery_profile.sh
 Expected: FAIL because `lib/recovery_profile.sh` and its validation functions
 do not exist.
 
-- [ ] **Step 3: Implement the profile library**
+- [x] **Step 3: Implement the profile library**
 
 Add strict IPv4/CIDR validation using Bash regular expressions plus numeric
 octet checks. Validate that gateway and host are in the same `/24` subnet, the
@@ -60,14 +60,14 @@ host is not the network, broadcast, or gateway address, and the port is `1`
 through `65535`. Keep interface existence as a separate `validate_recovery_interface`
 function so fixture tests remain offline.
 
-- [ ] **Step 4: Add profile defaults and common loading**
+- [x] **Step 4: Add profile defaults and common loading**
 
 Source the new library from `lib/common.sh` only after existing helpers are
 defined. Add commented empty defaults to `.env.example` and ensure an empty
 profile remains acceptable to existing commands that do not use initramfs
 networking.
 
-- [ ] **Step 5: Run profile tests and static checks**
+- [x] **Step 5: Run profile tests and static checks**
 
 Run:
 
@@ -78,7 +78,7 @@ make check
 
 Expected: PASS with no ShellCheck findings.
 
-- [ ] **Step 6: Commit the profile slice**
+- [x] **Step 6: Commit the profile slice**
 
 ```bash
 git add lib/common.sh lib/recovery_profile.sh .env.example tests/test_recovery_profile.sh tests/test_setup_commands.sh
@@ -96,7 +96,7 @@ git commit -m "Add recovery network profile validation"
 - Consumes: `VAULT_UUID`, `VAULT_MOUNTPOINT`, `VAULT_SUBDIR`, `REAL_USER`, and common logging helpers.
 - Produces: `require_audit_vault`, `audit_target_identity`, `audit_begin`, and `audit_finish`.
 
-- [ ] **Step 1: Write failing audit tests**
+- [x] **Step 1: Write failing audit tests**
 
 Test with command stubs and temporary directories that:
 
@@ -110,7 +110,7 @@ directory. Test that `audit_begin` creates a record with operation ID, UTC
 timestamps, action, target identity, and `status=planned`, while excluding
 environment values whose names contain `KEY`, `SECRET`, `PASSWORD`, or `TOKEN`.
 
-- [ ] **Step 2: Run the audit tests and verify failure**
+- [x] **Step 2: Run the audit tests and verify failure**
 
 Run:
 
@@ -120,7 +120,7 @@ bash tests/test_audit.sh
 
 Expected: FAIL because the audit library is not implemented.
 
-- [ ] **Step 3: Implement vault validation**
+- [x] **Step 3: Implement vault validation**
 
 Resolve the configured UUID through `/dev/disk/by-uuid`, compare the mounted
 source using `findmnt`, require the mountpoint to be a mountpoint, create the
@@ -128,7 +128,7 @@ host audit directory under `${VAULT_MOUNTPOINT}/${VAULT_SUBDIR}/hosts`, and
 require a write-and-remove probe before proceeding. Never fall back to the OS
 USB when the vault is unavailable.
 
-- [ ] **Step 4: Implement target identity capture**
+- [x] **Step 4: Implement target identity capture**
 
 Use `lsblk --json`, `udevadm info --query=property`, and `blkid` where
 available. Serialize model, serial, WWN, size, sector size, transport,
@@ -136,14 +136,14 @@ kernel device, partition table identifiers, filesystem UUID, and LUKS UUID as
 plain metadata. If a stable identity cannot be captured, fail closed for
 destructive operations.
 
-- [ ] **Step 5: Implement begin/finish records**
+- [x] **Step 5: Implement begin/finish records**
 
 Write records atomically through a temporary file in the vault directory and
 rename them into place. `audit_begin` must write `planned` before the caller
 touches the target. `audit_finish` must accept an explicit numeric exit status
 and write `completed` only for status zero; all other values write `failed`.
 
-- [ ] **Step 6: Run audit tests and static checks**
+- [x] **Step 6: Run audit tests and static checks**
 
 Run:
 
@@ -154,7 +154,7 @@ make check
 
 Expected: PASS with no ShellCheck findings.
 
-- [ ] **Step 7: Commit the audit slice**
+- [x] **Step 7: Commit the audit slice**
 
 ```bash
 git add lib/audit.sh .env.example tests/test_audit.sh
@@ -178,7 +178,7 @@ git commit -m "Add vault-backed audit primitives"
 - Consumes: `require_audit_vault`, `audit_target_identity`, `audit_begin`, and `audit_finish` from `lib/audit.sh`.
 - Produces: secure-erase commands that fail before device mutation when audit prerequisites are unavailable and record every attempted operation.
 
-- [ ] **Step 1: Write failing integration tests**
+- [x] **Step 1: Write failing integration tests**
 
 Stub destructive utilities and assert each secure-erase command refuses to call
 them when the vault is absent. Add a success fixture proving the stub utility
@@ -186,7 +186,7 @@ is called only after a `status=planned` record exists. Add failure fixtures for
 the destructive utility returning nonzero and verify the audit record is
 `failed`, not `completed`.
 
-- [ ] **Step 2: Run integration tests and verify failure**
+- [x] **Step 2: Run integration tests and verify failure**
 
 Run:
 
@@ -196,25 +196,25 @@ bash tests/test_secure_erase_audit.sh
 
 Expected: FAIL because the existing commands do not call the audit gate.
 
-- [ ] **Step 3: Add the shared audit invocation**
+- [x] **Step 3: Add the shared audit invocation**
 
 Source `lib/audit.sh` through the existing script path resolution. After target
 argument validation and before any erase capability probe that can mutate
 device state, capture identity and call `audit_begin`.
 
-- [ ] **Step 4: Record command outcomes safely**
+- [x] **Step 4: Record command outcomes safely**
 
 Run the existing erase operation with `set +e` only around the destructive
 command, capture its status, call `audit_finish`, restore strict mode, and exit
 with the original status. Preserve current target safety checks and warnings.
 
-- [ ] **Step 5: Update command documentation**
+- [x] **Step 5: Update command documentation**
 
 Document the vault prerequisite, the pre/post audit lifecycle, the fact that
 plaintext keys are never logged, and the explicit target confirmation required
 before erasure.
 
-- [ ] **Step 6: Run the complete verification suite**
+- [x] **Step 6: Run the complete verification suite**
 
 Run:
 
@@ -230,7 +230,7 @@ git diff --check
 
 Expected: all tests pass, ShellCheck passes, and no live device is touched.
 
-- [ ] **Step 7: Commit the integration slice**
+- [x] **Step 7: Commit the integration slice**
 
 ```bash
 git add bin lib tests docs
@@ -242,26 +242,26 @@ git commit -m "Fail closed on unaudited disk erasure"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-24-audit-gate-foundation.md`
 
-- [ ] **Step 1: Verify vault identity on `recovery`**
+- [x] **Step 1: Verify vault identity on `recovery`**
 
 Confirm the configured UUID is mounted at `/mnt/Vault`, verify the audit
 directory is writable, and record only a harmless read-only inspection of the
 OS USB and the separate vault device.
 
-- [ ] **Step 2: Verify fail-closed behavior**
+- [x] **Step 2: Verify fail-closed behavior**
 
 Temporarily unmount the vault without changing its contents, invoke a secure
 erase command against a non-target fixture or dry-run path, and confirm it
 refuses before invoking any destructive utility. Remount the vault and verify
 the operation remains represented as refused/failed rather than successful.
 
-- [ ] **Step 3: Verify no secrets escaped**
+- [x] **Step 3: Verify no secrets escaped**
 
 Search the repository, live toolkit directory, and audit records for private-key
 headers, LUKS key contents, and secret environment variable values. The check
 must find none.
 
-- [ ] **Step 4: Commit verification notes**
+- [x] **Step 4: Commit verification notes**
 
 ```bash
 git add docs/superpowers/plans/2026-08-24-audit-gate-foundation.md
@@ -286,3 +286,14 @@ After this plan is complete, create separate plans for:
   foundation plan and listed as follow-up plans.
 - No unresolved TODO/TBD placeholders are present; path and variable names are
   concrete.
+
+## Verification Evidence
+
+- `make test`, `make check`, and `git diff --check` pass locally.
+- The verified revision was deployed to `recovery` at `ebc1e2d`.
+- With `/mnt/Vault` unmounted, `hdd-secure-erase /dev/sdd1` refused after
+  confirmation and returned nonzero before invoking an erase utility.
+- The vault remounted from UUID `da868d4d-9d3b-4bc8-b2a0-dd49b3b63671`.
+- A read-only `/dev/sdd1` inspection produced a completed audit record under
+  `/mnt/Vault/recovery-toolkit-vault/hosts/recovery/` without secret-like
+  content.
