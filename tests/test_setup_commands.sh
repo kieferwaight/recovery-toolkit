@@ -65,6 +65,9 @@ TEST_USER_HOME="${tmp_dir}/home"
 mkdir -p "${TEST_USER_HOME}"
 
 authorized_keys="${tmp_dir}/authorized_keys"
+installed_bin="${tmp_dir}/installed-bin"
+mkdir -p "${installed_bin}"
+ln -s "${repo_dir}/bin/setup-ssh" "${installed_bin}/setup-ssh"
 sudo env PATH="${stub_bin}:${PATH}" \
   SUDO_USER="${USER}" AUTHORIZED_KEYS_FILE="${authorized_keys}" \
   TEST_PUBLIC_KEY_FILE="${tmp_dir}/test-key.pub" TEST_USER_HOME="${TEST_USER_HOME}" \
@@ -72,7 +75,7 @@ sudo env PATH="${stub_bin}:${PATH}" \
 sudo env PATH="${stub_bin}:${PATH}" \
   SUDO_USER="${USER}" AUTHORIZED_KEYS_FILE="${authorized_keys}" \
   TEST_PUBLIC_KEY_FILE="${tmp_dir}/test-key.pub" TEST_USER_HOME="${TEST_USER_HOME}" \
-  "${repo_dir}/bin/setup-ssh" >/dev/null
+  "${installed_bin}/setup-ssh" >/dev/null
 
 [[ "$(wc -l < "${authorized_keys}")" -eq 1 ]]
 
