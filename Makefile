@@ -31,7 +31,7 @@ symlinks:
 hooks:
 	@echo "==> Installing shellcheck pre-commit hook..."
 	@mkdir -p .git/hooks
-	@printf '#!/usr/bin/env bash\nset -e\nmake check\n' > .git/hooks/pre-commit
+	@printf '#!/usr/bin/env bash\nset -e\nmake check\nmake test\n' > .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
 
 check:
@@ -51,3 +51,5 @@ test:
 	./tests/test_disk_identity.sh
 	@echo "==> Running provisioning profile tests..."
 	./tests/test_provision_luks.sh
+	@echo "==> Running initramfs unlock tests..."
+	./tests/test_initramfs_unlock.sh

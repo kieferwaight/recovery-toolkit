@@ -67,6 +67,10 @@ permissions.
 See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
 LUKS key/header storage and disk identification.
 
+For the initramfs unlock workflow, see
+[docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md](docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md)
+and the `setup-initramfs-unlock` command.
+
 Before any provisioning or erase workflow, inspect a target by stable identity:
 
 ```bash

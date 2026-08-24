@@ -1,5 +1,6 @@
 # Disk wiping, sanitize, and partitioning
 cryptsetup
+dropbear-initramfs
 nvme-cli
 hdparm
 smartmontools

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "${SCRIPT_PATH}" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+  SCRIPT_PATH="$(readlink "${SCRIPT_PATH}")"
+  [[ "${SCRIPT_PATH}" != /* ]] && SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_PATH}"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/initramfs_unlock.sh
+source "${SCRIPT_DIR}/../lib/initramfs_unlock.sh"
+
+APPLY=0
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --apply) APPLY=1 ;;
+    --dry-run) APPLY=0 ;;
+    -h|--help)
+      echo 'Usage: sudo setup-initramfs-unlock [--dry-run|--apply]'
+      echo 'Default mode prints the Dropbear initramfs configuration plan.'
+      exit 0
+      ;;
+    *) log_error "Unknown argument: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+require_root
+load_env
+validate_initramfs_unlock_profile || {
+  log_error 'Initramfs unlock profile is incomplete or invalid.'
+  exit 1
+}
+
+printf 'recovery_interface=%s\n' "${RECOVERY_INTERFACE}"
+printf 'recovery_host_ip=%s\n' "${RECOVERY_HOST_IP}"
+printf 'recovery_gateway=%s\n' "${RECOVERY_GATEWAY}"
+printf 'recovery_subnet=%s\n' "${RECOVERY_SUBNET}"
+printf 'recovery_ssh_port=%s\n' "${RECOVERY_SSH_PORT}"
+printf 'initramfs_dropbear_config=%s\n' "${INITRAMFS_DROPBEAR_CONFIG}"
+printf '%s\n' 'dropbear_options=-s -j -k -I 60'
+printf '%s\n' 'authorized_keys entry: forced cryptroot-unlock only'
+
+if ((APPLY == 0)); then
+  log_info 'Dry run only; no initramfs files were written.'
+  exit 0
+fi
+
+install -d -m 0700 "${INITRAMFS_DROPBEAR_DIR}"
+initramfs_unlock_dropbear_config > "${INITRAMFS_DROPBEAR_CONFIG}"
+initramfs_unlock_authorized_key "${RECOVERY_UNLOCK_KEY}" > "${INITRAMFS_DROPBEAR_AUTH_KEYS}"
+chmod 0600 "${INITRAMFS_DROPBEAR_CONFIG}" "${INITRAMFS_DROPBEAR_AUTH_KEYS}"
+log_info "Wrote initramfs Dropbear config to ${INITRAMFS_DROPBEAR_DIR}."
