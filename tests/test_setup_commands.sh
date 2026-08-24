@@ -24,6 +24,7 @@ assert_contains "${repo_dir}/bin/setup-vault" 'ID_FS_UUID'
 assert_contains "${repo_dir}/bin/setup-vault" 'BindsTo='
 assert_contains "${repo_dir}/bin/setup-vault" 'noatime,lazytime,nosuid,nodev'
 assert_contains "${repo_dir}/lib/common.sh" 'recovery_profile.sh'
+assert_contains "${repo_dir}/lib/common.sh" 'lsblk -sno NAME,TYPE'
 if grep -Fq '/etc/fstab' "${repo_dir}/bin/setup-vault"; then
   echo "vault setup must not use fstab" >&2
   exit 1

@@ -56,8 +56,9 @@ assert_not_boot_disk() {
   # Find the underlying parent disk for the current root filesystem
   local root_src
   root_src="$(findmnt -n -o SOURCE /)"
-  local boot_disk
-  boot_disk="/dev/$(lsblk -no pkname "${root_src}" | head -n 1)"
+  local boot_disk boot_disk_name
+  boot_disk_name="$(lsblk -sno NAME,TYPE "${root_src}" 2>/dev/null | awk '$2 == "disk" { print $1; exit }' | LC_ALL=C tr -cd '[:alnum:]_-')"
+  boot_disk="/dev/${boot_disk_name}"
 
   if [[ -z "${boot_disk}" || "${boot_disk}" == "/dev/" ]]; then
     # Fallback if root is directly on a non-partitioned block
