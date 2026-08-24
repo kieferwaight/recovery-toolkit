@@ -10,7 +10,7 @@ idempotently symlinks the `bin/` commands into `/usr/local/bin`. Run `make all`
 afterward if you also want the shellcheck pre-commit hook.
 
 ## Layout
-- `bin/` - toolkit executables (secure erase, USB tuning, overlay boot setup)
+- `bin/` - toolkit executables (disk inspection, secure erase, USB tuning, overlay boot setup)
 - `setup-ssh` - enables SSH and authorizes GitHub public keys
 - `setup-tailscale` - installs and authorizes Tailscale
 - `lib/common.sh` - shared logging, `.env` loading, and safety guards
@@ -66,3 +66,12 @@ permissions.
 
 See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
 LUKS key/header storage and disk identification.
+
+Before any provisioning or erase workflow, inspect a target by stable identity:
+
+```bash
+sudo inspect-disk /dev/disk/by-id/...
+```
+
+The command is read-only and prints a fingerprint based on the device's model,
+serial, WWN, transport, size, and filesystem identifiers.

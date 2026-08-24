@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "${SCRIPT_PATH}" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+  SCRIPT_PATH="$(readlink "${SCRIPT_PATH}")"
+  [[ "${SCRIPT_PATH}" != /* ]] && SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_PATH}"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/disk_identity.sh
+source "${SCRIPT_DIR}/../lib/disk_identity.sh"
+
+TARGET="${1:-}"
+if [[ -z "${TARGET}" || "${TARGET}" == "-h" || "${TARGET}" == "--help" ]]; then
+  echo "Usage: sudo inspect-disk /dev/disk/by-id/..."
+  echo "Prints stable target identity without modifying the device."
+  exit 1
+fi
+
+require_root
+load_env
+assert_block_device "${TARGET}"
+assert_not_boot_disk "${TARGET}"
+
+metadata="$(disk_identity "${TARGET}")"
+printf '%s\n' "${metadata}"
+printf 'identity_fingerprint=%s\n' "$(disk_identity_fingerprint "${metadata}")"

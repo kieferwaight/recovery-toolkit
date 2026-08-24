@@ -47,3 +47,5 @@ test:
 	./tests/test_audit.sh
 	@echo "==> Running secure erase audit contract..."
 	./tests/test_secure_erase_audit.sh
+	@echo "==> Running disk identity tests..."
+	./tests/test_disk_identity.sh
