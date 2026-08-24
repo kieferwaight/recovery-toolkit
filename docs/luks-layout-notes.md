@@ -38,12 +38,16 @@ encrypted vault, and keep the OS USB free of long-lived cleartext key material.
 stable target identity and refuses the active recovery USB. The mutating path
 will remain behind the vault audit gate and explicit identity confirmation.
 
-Use the following sequence during a maintenance session:
+Use the following sequence during a host provisioning or recovery session:
 
 ```bash
 sudo setup-vault
 sudo inspect-disk /dev/disk/by-id/<target>
 sudo provision-luks --target /dev/disk/by-id/<target>
+
+If you are only maintaining the recovery USB itself, do not run the host
+provisioning commands. USB maintenance work stays separate and should not
+require rebooting the installer environment just to continue host deployment.
 ```
 
 Review the fingerprint and planned commands first. The future mutating path

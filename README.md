@@ -10,7 +10,7 @@ idempotently symlinks the `bin/` commands into `/usr/local/bin`. Run `make all`
 afterward if you also want the shellcheck pre-commit hook.
 
 ## Layout
-- `bin/` - toolkit executables (disk inspection, secure erase, USB tuning, overlay boot setup)
+- `bin/` - toolkit executables for host deployment, vault management, and USB maintenance
 - `setup-ssh` - enables SSH and authorizes GitHub public keys
 - `setup-tailscale` - installs and authorizes Tailscale
 - `lib/common.sh` - shared logging, `.env` loading, and safety guards
@@ -40,7 +40,7 @@ sudo setup-tailscale
 without duplicating existing entries. `setup-tailscale` installs and enables
 Tailscale; when authorization is needed, it prints the browser URL to open.
 
-For a RAM-first utility profile, run:
+For a RAM-first utility profile on the recovery USB itself, run:
 
 ```bash
 sudo optimize-usb
@@ -64,10 +64,10 @@ connecting and unlocking the matching vault automatically mounts it at
 `/mnt/Vault` and creates `/mnt/Vault/recovery-toolkit-vault` with private
 permissions.
 
-See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
-LUKS key/header storage and disk identification.
+See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the host
+provisioning plan around LUKS key/header storage and disk identification.
 
-For the initramfs unlock workflow, see
+For the initramfs unlock workflow on the host, see
 [docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md](docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md)
 and the `setup-initramfs-unlock` command.
 

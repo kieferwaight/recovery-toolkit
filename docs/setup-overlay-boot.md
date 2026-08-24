@@ -1,5 +1,9 @@
 # setup-overlay-boot
 
+This is a recovery USB maintenance command, not part of the host provisioning
+workflow. Keep it out of the live host path unless you intentionally need to
+rebuild the USB boot behavior.
+
 Configures the recovery USB with three selectable GRUB boot profiles so the
 USB can be dropped into ephemeral "provisioning" use without risking wear or
 data leakage, while still allowing a persistent mode for maintenance.

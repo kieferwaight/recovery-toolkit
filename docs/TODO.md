@@ -1,2 +1,3 @@
 # TODO
-- Create shellcheck git hook
+- Create host Ubuntu install/bootstrap command
+- Split USB maintenance docs from host provisioning docs
