@@ -152,8 +152,9 @@ rebuild the USB.
 The generated autoinstall file is written only to the mounted vault with mode
 `0600`. It contains the stable target path, the preserved GPT partition/LUKS2/
 LVM/XFS storage graph, the vault path of the LUKS key file, and the operator's
-host identity settings. The LUKS key contents are never inserted into YAML or
-logs. Subiquity and its Curtin backend format the EFI and `/boot` partitions,
+host identity settings. The vault LUKS key is staged into memory for the
+installer and the YAML contains only that ephemeral runtime `keyfile` path;
+the key contents are never inserted into YAML or logs. Subiquity and its Curtin backend format the EFI and `/boot` partitions,
 reuse the pre-created encrypted root graph, and populate the target from the
 currently mounted installer source (normally `/cdrom`).
 

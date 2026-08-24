@@ -16,7 +16,7 @@
 - `install-ubuntu-server` is read-only by default; target changes require `--apply`, the vault audit gate, and exact target fingerprint confirmation.
 - The target is selected by a stable `/dev/disk/by-id/...` path and must not be the active boot disk or configured vault device.
 - The installer source is the currently booted Ubuntu Server installation source, normally `/cdrom`; the command does not use `debootstrap`.
-- LUKS key contents never appear in YAML, logs, Git, `.env`, or the operating USB; YAML may contain only a vault-backed `keyfile` path.
+- LUKS key contents never appear in YAML, logs, Git, or `.env`; the vault key is staged into RAM and YAML may contain only the ephemeral runtime `keyfile` path.
 - Generated installer configuration and evidence use mode `0600` below `${VAULT_MOUNTPOINT}/${VAULT_SUBDIR}/hosts/${HOST_ID}/installer/`.
 - No reboot is invoked by the toolkit command; final power-state handling remains with the operator.
 
@@ -34,7 +34,7 @@
 - Consumes: `load_provision_profile`, `disk_identity_value`, and the existing recovery/audit profile conventions.
 - Produces: `load_ubuntu_install_profile`, `validate_ubuntu_install_profile`, `load_ubuntu_identity_file`, `validate_ubuntu_identity`, and `render_ubuntu_autoinstall`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create a fixture-driven shell test that sources `lib/ubuntu_install.sh` and
 sets these values:
@@ -65,13 +65,13 @@ Add failures for a missing identity file, an insecure multiline key, an
 inline LUKS key field, a non-absolute installer source, and an identity file
 with permissions broader than `0600`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./tests/test_ubuntu_install.sh`
 
 Expected: FAIL because the profile functions and renderer do not exist.
 
-- [ ] **Step 3: Implement the minimal profile and renderer**
+- [x] **Step 3: Implement the minimal profile and renderer**
 
 Add these profile defaults:
 
@@ -89,14 +89,14 @@ partitions, LUKS container, volume group, logical volume, and XFS root. Use the
 exact EFI, `/boot`, and encrypted partition sizes supplied by disk inspection.
 Format only EFI as `fat32` and `/boot` as `ext4`.
 
-- [ ] **Step 4: Run the focused test to verify it passes**
+- [x] **Step 4: Run the focused test to verify it passes**
 
 Run: `./tests/test_ubuntu_install.sh`
 
 Expected: PASS with no plaintext password variable name or LUKS key content in
 the rendered document.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/ubuntu_install.sh .env.example packages/base.apt.list tests/test_ubuntu_install.sh
@@ -116,7 +116,7 @@ git commit -m "Add Ubuntu installer profile renderer"
 - Consumes: `validate_ubuntu_install_profile`, `render_ubuntu_autoinstall`, `require_audit_vault`, `audit_target_identity`, `audit_begin`, `audit_finish`, and `confirm_destructive`.
 - Produces: `install-ubuntu-server [--dry-run|--apply] [--target /dev/disk/by-id/...]`.
 
-- [ ] **Step 1: Write failing command-contract tests**
+- [x] **Step 1: Write failing command-contract tests**
 
 Assert the command contains the required guards and invocation:
 
@@ -132,13 +132,13 @@ grep -Fq 'DRY_RUN=1' "${repo_dir}/bin/install-ubuntu-server"
 Use command stubs to verify the dry-run path does not invoke `subiquity`,
 `mount`, `cryptsetup`, `mkfs`, `sgdisk`, or `partprobe`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./tests/test_ubuntu_install.sh`
 
 Expected: FAIL because the command does not exist.
 
-- [ ] **Step 3: Implement the dry-run command**
+- [x] **Step 3: Implement the dry-run command**
 
 The command loads `.env`, accepts an optional stable target override, validates
 the target, rejects the boot disk and configured vault device, confirms the
@@ -148,7 +148,7 @@ target fingerprint, source path, vault evidence directory, and exact Subiquity
 invocation without printing secrets. It exits before any device or installer
 command in the default dry-run mode.
 
-- [ ] **Step 4: Implement the guarded apply path**
+- [x] **Step 4: Implement the guarded apply path**
 
 On `--apply`, require root, `require_audit_vault`, a second identity read that
 matches the initial fingerprint, and the existing exact fingerprint prompt.
@@ -164,13 +164,13 @@ Always call `audit_finish` with the Subiquity exit status and record the config
 SHA-256, installer source identity, target fingerprint, and key SHA-256 in the
 vault manifest. Do not copy private or LUKS key contents into the target root.
 
-- [ ] **Step 5: Run focused and full tests**
+- [x] **Step 5: Run focused and full tests**
 
 Run: `./tests/test_ubuntu_install.sh && make check && make test && git diff --check`
 
 Expected: PASS; no command writes outside the test fixture or vault fixture.
 
-- [ ] **Step 6: Update user documentation**
+- [x] **Step 6: Update user documentation**
 
 Document this order:
 
@@ -186,7 +186,7 @@ environment, uses the mounted installer source, and does not modify or reboot
 the recovery USB. Point the follow-up initramfs task at the installed target
 root rather than the USB root.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add bin/install-ubuntu-server Makefile tests/test_ubuntu_install.sh README.md docs/luks-layout-notes.md
@@ -200,19 +200,19 @@ git commit -m "Add guarded Ubuntu Server installer command"
 - Modify: `docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md`
 - Modify: `docs/superpowers/plans/2026-08-24-ubuntu-server-installation.md`
 
-- [ ] **Step 1: Record the next dependent objective**
+- [x] **Step 1: Record the next dependent objective**
 
 Replace the completed host installer item in `docs/TODO.md` with the next
 dependent objective: make `setup-initramfs-unlock` operate on an explicit target
 root and run `update-initramfs` without writing to the USB.
 
-- [ ] **Step 2: Verify the repository**
+- [x] **Step 2: Verify the repository**
 
 Run: `make check && make test && git diff --check && git status --short --branch`
 
 Expected: all checks pass and the working tree is clean after the commits.
 
-- [ ] **Step 3: Commit and push**
+- [x] **Step 3: Commit and push**
 
 ```bash
 git push origin main

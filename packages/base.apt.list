@@ -10,6 +10,7 @@ parted
 dosfstools
 e2fsprogs
 xfsprogs
+curtin
 
 # Utilities & Imaging
 pv

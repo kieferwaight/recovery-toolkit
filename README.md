@@ -13,6 +13,7 @@ afterward if you also want the shellcheck pre-commit hook.
 - `bin/` - toolkit executables for host deployment, vault management, and USB maintenance
 - `setup-ssh` - enables SSH and authorizes GitHub public keys
 - `setup-tailscale` - installs and authorizes Tailscale
+- `install-ubuntu-server` - runs the guarded Ubuntu Server Subiquity handoff on a prepared host disk
 - `lib/common.sh` - shared logging, `.env` loading, and safety guards
 - `packages/` - apt package list installed by the toolkit
 - `docs/` - usage notes per tool, plus LUKS layout planning
@@ -79,3 +80,17 @@ sudo inspect-disk /dev/disk/by-id/...
 
 The command is read-only and prints a fingerprint based on the device's model,
 serial, WWN, transport, size, and filesystem identifiers.
+
+After the disk is sanitized and the LUKS2/LVM/XFS layout is prepared, configure
+the vault-backed identity and LUKS key paths in `.env` and run:
+
+```bash
+sudo install-ubuntu-server --target /dev/disk/by-id/...
+sudo install-ubuntu-server --target /dev/disk/by-id/... --apply
+```
+
+The command starts Subiquity with `--autoinstall` from the currently booted
+Ubuntu Server environment and uses its mounted installer source, normally
+`/cdrom`. It writes the generated configuration and evidence under the vault,
+does not rebuild or modify the recovery USB, and leaves initramfs finalization
+to the next host-targeted step.

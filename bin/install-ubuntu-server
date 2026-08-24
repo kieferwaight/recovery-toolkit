@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "${SCRIPT_PATH}" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+  SCRIPT_PATH="$(readlink "${SCRIPT_PATH}")"
+  [[ "${SCRIPT_PATH}" != /* ]] && SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_PATH}"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/audit.sh
+source "${SCRIPT_DIR}/../lib/audit.sh"
+# shellcheck source=../lib/disk_identity.sh
+source "${SCRIPT_DIR}/../lib/disk_identity.sh"
+# shellcheck source=../lib/ubuntu_install.sh
+source "${SCRIPT_DIR}/../lib/ubuntu_install.sh"
+
+DRY_RUN=1
+CLI_TARGET=''
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --apply) DRY_RUN=0 ;;
+    --dry-run) DRY_RUN=1 ;;
+    --target)
+      [[ "$#" -ge 2 ]] || { log_error '--target requires a value.'; exit 1; }
+      CLI_TARGET="$2"
+      shift
+      ;;
+    -h|--help)
+      echo 'Usage: sudo install-ubuntu-server [--dry-run|--apply] [--target /dev/disk/by-id/...]'
+      echo 'Default mode is read-only. --apply requires the vault and exact target confirmation.'
+      exit 0
+      ;;
+    *) log_error "Unknown argument: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+require_root
+load_env
+if [[ -n "${CLI_TARGET}" ]]; then
+  TARGET_DISK="${CLI_TARGET}"
+fi
+validate_ubuntu_install_profile || {
+  log_error 'Ubuntu installer profile is incomplete or invalid.'
+  exit 1
+}
+assert_block_device "${TARGET_DISK}"
+assert_not_boot_disk "${TARGET_DISK}"
+
+metadata="$(disk_identity "${TARGET_DISK}")"
+fingerprint="$(disk_identity_fingerprint "${metadata}")"
+target_real="$(readlink -f "${TARGET_DISK}")"
+vault_device=''
+if [[ -n "${VAULT_UUID:-}" ]]; then
+  vault_device="$(readlink -f "/dev/disk/by-uuid/${VAULT_UUID}" 2>/dev/null || true)"
+fi
+target_parent="$(lsblk -no PKNAME "${target_real}" 2>/dev/null || true)"
+vault_parent="$(lsblk -no PKNAME "${vault_device}" 2>/dev/null || true)"
+if [[ -n "${vault_device}" && ( "${target_real}" == "${vault_device}" || ( -n "${target_parent}" && "${target_parent}" == "${vault_parent}" ) ) ]]; then
+  log_error 'Safety violation: target is the configured vault device.'
+  exit 2
+fi
+
+source_squashfs="${UBUNTU_INSTALLER_SOURCE}/casper/filesystem.squashfs"
+[[ -f "${source_squashfs}" ]] || {
+  log_error "Ubuntu installer source is missing ${source_squashfs}."
+  exit 1
+}
+vault_root="${VAULT_MOUNTPOINT:-/mnt/Vault}/${VAULT_SUBDIR:-recovery-toolkit-vault}"
+case "${UBUNTU_IDENTITY_FILE}" in
+  "${vault_root}"/*) ;;
+  *) log_error 'Ubuntu identity file must be stored under the configured vault.'; exit 1 ;;
+esac
+case "${UBUNTU_LUKS_KEY_FILE}" in
+  "${vault_root}"/*) ;;
+  *) log_error 'LUKS key file must be stored under the configured vault.'; exit 1 ;;
+esac
+[[ -f "${UBUNTU_LUKS_KEY_FILE}" ]] || {
+  log_error 'Configured LUKS key file does not exist.'
+  exit 1
+}
+
+partition_path() {
+  local number="$1"
+  lsblk -nrpo NAME,PARTN "${TARGET_DISK}" | awk -v number="${number}" '$2 == number { print $1; exit }'
+}
+
+efi_partition="$(partition_path 1)"
+boot_partition="$(partition_path 2)"
+crypt_partition="$(partition_path 3)"
+[[ -b "${efi_partition}" && -b "${boot_partition}" && -b "${crypt_partition}" ]] || {
+  log_error 'Target does not expose the expected three-partition prepared layout.'
+  exit 1
+}
+efi_size_bytes="$(blockdev --getsize64 "${efi_partition}")"
+boot_size_bytes="$(blockdev --getsize64 "${boot_partition}")"
+crypt_size_bytes="$(blockdev --getsize64 "${crypt_partition}")"
+runtime_key_file='/run/recovery-luks-key'
+evidence_root="${vault_root}/hosts/${HOST_ID}/installer"
+
+printf 'host_id=%s\n' "${HOST_ID}"
+printf 'target_fingerprint=%s\n' "${fingerprint}"
+printf 'installer_source=%s\n' "${UBUNTU_INSTALLER_SOURCE}"
+printf 'installer_squashfs=%s\n' "${source_squashfs}"
+printf 'evidence_root=%s\n' "${evidence_root}"
+printf '%s\n' 'layout=preserved GPT + EFI + /boot + LUKS2 + LVM + XFS'
+printf '%s\n' 'planned_command: subiquity --autoinstall <vault-rendered-config>'
+
+if ((DRY_RUN == 1)); then
+  log_info 'Dry run only; no device, vault, or installer changes were made.'
+  exit 0
+fi
+
+require_audit_vault
+confirm_destructive "${TARGET_DISK}"
+metadata_confirm="$(disk_identity "${TARGET_DISK}")"
+fingerprint_confirm="$(disk_identity_fingerprint "${metadata_confirm}")"
+if [[ "${fingerprint_confirm}" != "${fingerprint}" ]]; then
+  log_error 'Target identity changed after confirmation; refusing Ubuntu installation.'
+  exit 2
+fi
+read -rp "Type target fingerprint '${fingerprint}' to authorize Ubuntu installation: " fingerprint_response
+if [[ "${fingerprint_response}" != "${fingerprint}" ]]; then
+  log_info 'Ubuntu installation canceled: target fingerprint did not match.'
+  exit 0
+fi
+command -v subiquity >/dev/null 2>&1 || {
+  log_error 'Subiquity is not available in the current Ubuntu Server environment.'
+  exit 1
+}
+[[ "$(findmnt -n -o FSTYPE /dev/shm 2>/dev/null || true)" == 'tmpfs' ]] || {
+  log_error '/dev/shm is not a tmpfs; refusing to stage the LUKS key.'
+  exit 1
+}
+
+source_sha256="$(sha256sum "${source_squashfs}" | awk '{print $1}')"
+audit_begin 'install-ubuntu-server' "${TARGET_DISK}" "${metadata_confirm}"
+installer_root="${AUDIT_ROOT}/hosts/${HOST_ID}/installer/${AUDIT_OPERATION_ID}"
+autoinstall_path="${installer_root}/autoinstall.yaml"
+manifest_path="${installer_root}/manifest.env"
+mkdir -p "${installer_root}"
+umask 077
+runtime_key_file="$(mktemp /dev/shm/recovery-ubuntu-luks-key.XXXXXX)"
+runtime_config="$(mktemp /dev/shm/recovery-ubuntu-autoinstall.XXXXXX)"
+trap 'rm -f "${runtime_key_file:-}" "${runtime_config:-}"' EXIT
+cp --preserve=mode "${UBUNTU_LUKS_KEY_FILE}" "${runtime_key_file}"
+chmod 0600 "${runtime_key_file}"
+render_ubuntu_autoinstall "${efi_size_bytes}" "${boot_size_bytes}" "${crypt_size_bytes}" "${runtime_key_file}" >"${runtime_config}"
+chmod 0600 "${runtime_config}"
+install -m 0600 "${runtime_config}" "${autoinstall_path}"
+config_sha256="$(sha256sum "${autoinstall_path}" | awk '{print $1}')"
+key_sha256="$(sha256sum "${runtime_key_file}" | awk '{print $1}')"
+
+set +e
+subiquity --autoinstall "${autoinstall_path}"
+installer_status=$?
+set -e
+
+printf '%s\n' \
+  "host_id=${HOST_ID}" \
+  "target_fingerprint=${fingerprint}" \
+  "installer_source=${UBUNTU_INSTALLER_SOURCE}" \
+  "installer_squashfs_sha256=${source_sha256}" \
+  "autoinstall_sha256=${config_sha256}" \
+  "luks_key_sha256=${key_sha256}" \
+  "autoinstall_path=${autoinstall_path}" \
+  "subiquity_exit_status=${installer_status}" >"${manifest_path}"
+chmod 0600 "${manifest_path}"
+audit_finish "${installer_status}"
+if ((installer_status != 0)); then
+  log_error "Ubuntu Server installation failed with status ${installer_status}."
+  exit "${installer_status}"
+fi
+log_info "Ubuntu Server installation completed for ${HOST_ID}."

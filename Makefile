@@ -53,3 +53,5 @@ test:
 	./tests/test_provision_luks.sh
 	@echo "==> Running initramfs unlock tests..."
 	./tests/test_initramfs_unlock.sh
+	@echo "==> Running Ubuntu installer tests..."
+	./tests/test_ubuntu_install.sh

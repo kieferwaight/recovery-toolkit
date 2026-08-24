@@ -44,6 +44,8 @@ Use the following sequence during a host provisioning or recovery session:
 sudo setup-vault
 sudo inspect-disk /dev/disk/by-id/<target>
 sudo provision-luks --target /dev/disk/by-id/<target>
+sudo install-ubuntu-server --target /dev/disk/by-id/<target>
+sudo install-ubuntu-server --target /dev/disk/by-id/<target> --apply
 
 If you are only maintaining the recovery USB itself, do not run the host
 provisioning commands. USB maintenance work stays separate and should not
@@ -54,6 +56,15 @@ Review the fingerprint and planned commands first. The future mutating path
 will require the vault to be mounted, the target fingerprint to be re-read and
 confirmed, and the explicit `NUKE` confirmation. Never use `/dev/sdX` as the
 operator-facing target identifier.
+
+`install-ubuntu-server --apply` starts the official Ubuntu Server Subiquity
+installer from the currently booted environment and points it at the
+vault-rendered autoinstall configuration. The configuration preserves the
+prepared encrypted root graph, formats only EFI and `/boot`, and uses the
+installer source already mounted at `/cdrom`. It does not modify the recovery
+USB. Do not run the current `setup-initramfs-unlock` command against the USB
+root after installation; the next implementation must accept the installed
+target root and rebuild that target's initramfs.
 
 link to 
 [Hdd Secure Erase](./hdd-secure-erase.md)

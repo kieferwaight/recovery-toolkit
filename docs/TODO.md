@@ -1,3 +1,3 @@
 # TODO
-- Create host Ubuntu install/bootstrap command
 - Split USB maintenance docs from host provisioning docs
+- Make setup-initramfs-unlock target an installed host root and rebuild its initramfs
