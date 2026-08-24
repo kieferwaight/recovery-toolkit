@@ -9,10 +9,13 @@ while [[ -L "${SCRIPT_PATH}" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
-source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../../lib/common.sh"
+# shellcheck source=lib/usb_context.sh
+source "${SCRIPT_DIR}/../../lib/usb_context.sh"
 
 require_root
 load_env
+usb_require_make_context
 
 backup_dir="/root/recovery-toolkit-optimization-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "${backup_dir}"

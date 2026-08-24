@@ -52,6 +52,7 @@ cd "${INSTALL_DIR}"
 if [[ ! -f .env && -f .env.example ]]; then
   cp .env.example .env
 fi
-chmod +x bootstrap.sh packages/setup-packages.sh bin/*
+chmod +x bootstrap.sh bin/*
 
 make install
+make usb-install

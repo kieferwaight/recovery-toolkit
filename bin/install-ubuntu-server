@@ -10,6 +10,8 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/device_guard.sh
+source "${SCRIPT_DIR}/../lib/device_guard.sh"
 # shellcheck source=../lib/audit.sh
 source "${SCRIPT_DIR}/../lib/audit.sh"
 # shellcheck source=../lib/disk_identity.sh
@@ -48,7 +50,7 @@ validate_ubuntu_install_profile || {
   exit 1
 }
 assert_block_device "${TARGET_DISK}"
-assert_not_boot_disk "${TARGET_DISK}"
+assert_not_protected_disk "${TARGET_DISK}"
 
 metadata="$(disk_identity "${TARGET_DISK}")"
 fingerprint="$(disk_identity_fingerprint "${metadata}")"

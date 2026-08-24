@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/../../lib/common.sh"
+# shellcheck source=lib/device_guard.sh
+source "${SCRIPT_DIR}/../../lib/device_guard.sh"
+# shellcheck source=lib/usb_context.sh
+source "${SCRIPT_DIR}/../../lib/usb_context.sh"
+
+require_root
+load_env
+usb_require_make_context
+
+log_info 'USB preflight complete; no device or vault changes were made.'

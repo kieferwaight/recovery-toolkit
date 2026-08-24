@@ -9,10 +9,13 @@ while [[ -L "${SCRIPT_PATH}" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
-source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../../lib/common.sh"
+# shellcheck source=lib/usb_context.sh
+source "${SCRIPT_DIR}/../../lib/usb_context.sh"
 
 require_root
 load_env
+usb_require_make_context
 
 REAL_USER="${SUDO_USER:-${USER}}"
 USER_HOME="$(getent passwd "${REAL_USER}" | cut -d: -f6)"

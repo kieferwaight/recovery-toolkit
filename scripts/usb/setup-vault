@@ -9,7 +9,9 @@ while [[ -L "${SCRIPT_PATH}" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
-source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../../lib/common.sh"
+# shellcheck source=lib/usb_context.sh
+source "${SCRIPT_DIR}/../../lib/usb_context.sh"
 
 require_root
 load_env
@@ -36,6 +38,8 @@ if [[ -z "${VAULT_SUBDIR}" || "${VAULT_SUBDIR}" == */* || "${VAULT_SUBDIR}" == .
   log_error "VAULT_SUBDIR must be a single directory name."
   exit 1
 fi
+
+usb_require_make_context
 
 vault_device="/dev/disk/by-uuid/${VAULT_UUID}"
 mount_unit="$(systemd-escape --path --suffix=mount "${VAULT_MOUNTPOINT}")"

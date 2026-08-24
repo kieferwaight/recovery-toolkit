@@ -5,14 +5,15 @@ After a fresh install of ubuntu on a portable usb, you can install the toolkit w
 curl -fsSL https://raw.githubusercontent.com/kieferwaight/recovery-toolkit/main/bootstrap.sh | sudo bash
 ```
 
-This loads the repo and runs `make install`, which installs packages and
-idempotently symlinks the `bin/` commands into `/usr/local/bin`. Run `make all`
-afterward if you also want the shellcheck pre-commit hook.
+This loads the repo and runs the explicit installation targets for the recovery
+USB. `make install` installs only host-facing commands; `make usb-install`
+installs the packages used by the USB environment. Run `make all` afterward if
+you also want the shellcheck pre-commit hook.
 
 ## Layout
-- `bin/` - toolkit executables for host deployment, vault management, and USB maintenance
-- `setup-ssh` - enables SSH and authorizes GitHub public keys
-- `setup-tailscale` - installs and authorizes Tailscale
+- `bin/` - installed host-facing commands for disk deployment and recovery
+- `scripts/usb/` - non-installed recovery USB maintenance scripts
+- `setup-ssh`, `setup-tailscale` - USB maintenance targets invoked through `make usb-*`
 - `install-ubuntu-server` - runs the guarded Ubuntu Server Subiquity handoff on a prepared host disk
 - `lib/common.sh` - shared logging, `.env` loading, and safety guards
 - `packages/` - apt package list installed by the toolkit
@@ -29,22 +30,49 @@ at its defaults.
 
 ## Network Access Setup
 
-Run these commands as root after installation. They are safe to rerun:
+The recovery USB is already protected by its own boot-time encryption prompt.
+That manual unlock is separate from the host's future remote initramfs unlock
+service. To reach the running USB over the Tailnet, use:
 
 ```bash
-sudo setup-ssh
-sudo setup-tailscale
+ssh kwaight@recovery
 ```
 
-`setup-ssh` installs and enables OpenSSH, then adds the current
+USB changes are intentionally not PATH commands. Review the active USB root
+and vault identity first, then use an explicit Makefile target:
+
+```bash
+sudo make usb-preflight
+sudo make usb-install       # one-time package/bootstrap setup
+sudo make usb-vault         # only when changing vault integration
+sudo make usb-ssh
+sudo make usb-tailscale
+sudo make usb-optimize
+sudo make usb-overlay
+```
+
+The Makefile prints the active root source/UUID and configured vault
+source/UUID before USB maintenance. `RECOVERY_USB_ROOT_UUID` can be set in
+`.env` to require an exact root UUID match. `VAULT_UUID` must identify a
+different physical disk; the vault-setup target is the only USB target that
+can proceed while the vault is not currently mounted.
+
+For the USB network setup, use the Makefile targets above:
+
+```bash
+sudo make usb-ssh
+sudo make usb-tailscale
+```
+
+The USB SSH script installs and enables OpenSSH, then adds the current
 `kieferwaight` GitHub public keys to the invoking user's `authorized_keys`
-without duplicating existing entries. `setup-tailscale` installs and enables
+without duplicating existing entries. The USB Tailscale script installs and enables
 Tailscale; when authorization is needed, it prints the browser URL to open.
 
 For a RAM-first utility profile on the recovery USB itself, run:
 
 ```bash
-sudo optimize-usb
+sudo make usb-optimize
 ```
 
 This creates a rollback snapshot under `/root`, removes unused snap support,
@@ -60,7 +88,7 @@ package/database integrity.
 For persistent secrets and LUKS recovery material, use a separate
 hardware-encrypted USB vault. Keep it out of `/etc/fstab`, verify its stable
 identity before mounting, and mount it only for the operation that needs it.
-Configure its filesystem UUID in `.env` and run `sudo setup-vault`; after that,
+Configure its filesystem UUID in `.env` and run `sudo make usb-vault`; after that,
 connecting and unlocking the matching vault automatically mounts it at
 `/mnt/Vault` and creates `/mnt/Vault/recovery-toolkit-vault` with private
 permissions.
@@ -70,7 +98,8 @@ provisioning plan around LUKS key/header storage and disk identification.
 
 For the initramfs unlock workflow on the host, see
 [docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md](docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md)
-and the `setup-initramfs-unlock` command.
+and the host-targeted `setup-initramfs-unlock --target-root MOUNT` command.
+It never writes the running USB's `/etc`, `/boot`, or initramfs.
 
 Before any provisioning or erase workflow, inspect a target by stable identity:
 

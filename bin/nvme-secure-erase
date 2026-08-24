@@ -10,6 +10,8 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/device_guard.sh
+source "${SCRIPT_DIR}/../lib/device_guard.sh"
 # shellcheck source=../lib/audit.sh
 source "${SCRIPT_DIR}/../lib/audit.sh"
 
@@ -24,7 +26,7 @@ fi
 require_root
 load_env
 assert_block_device "${TARGET}"
-assert_not_boot_disk "${TARGET}"
+assert_not_protected_disk "${TARGET}"
 
 log_info "Targeting: ${TARGET}"
 nvme id-ctrl "${TARGET}" -H | grep -i sanitize || true
