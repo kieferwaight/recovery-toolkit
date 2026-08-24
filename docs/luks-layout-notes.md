@@ -34,6 +34,10 @@ Lean towards generated keys with good entropy. Generate them only during an
 intentional maintenance or key-ceremony session, write them to the separate
 encrypted vault, and keep the OS USB free of long-lived cleartext key material.
 
+`provision-luks` currently provides a read-only plan by default. It requires a
+stable target identity and refuses the active recovery USB. The mutating path
+will remain behind the vault audit gate and explicit identity confirmation.
+
 link to 
 [Hdd Secure Erase](./hdd-secure-erase.md)
 [SSD Secure Erase](./ssd-secure-erase.md)

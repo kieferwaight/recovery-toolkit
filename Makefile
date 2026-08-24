@@ -49,3 +49,5 @@ test:
 	./tests/test_secure_erase_audit.sh
 	@echo "==> Running disk identity tests..."
 	./tests/test_disk_identity.sh
+	@echo "==> Running provisioning profile tests..."
+	./tests/test_provision_luks.sh

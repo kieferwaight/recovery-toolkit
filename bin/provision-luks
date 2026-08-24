@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "${SCRIPT_PATH}" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+  SCRIPT_PATH="$(readlink "${SCRIPT_PATH}")"
+  [[ "${SCRIPT_PATH}" != /* ]] && SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_PATH}"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/audit.sh
+source "${SCRIPT_DIR}/../lib/audit.sh"
+# shellcheck source=../lib/disk_identity.sh
+source "${SCRIPT_DIR}/../lib/disk_identity.sh"
+# shellcheck source=../lib/provision_profile.sh
+source "${SCRIPT_DIR}/../lib/provision_profile.sh"
+
+DRY_RUN=1
+CLI_TARGET=''
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --confirm) DRY_RUN=0 ;;
+    --dry-run) DRY_RUN=1 ;;
+    --target)
+      [[ "$#" -ge 2 ]] || { log_error '--target requires a value.'; exit 1; }
+      CLI_TARGET="$2"
+      shift
+      ;;
+    -h|--help)
+      echo 'Usage: sudo provision-luks [--target /dev/disk/by-id/...] [--dry-run]'
+      echo '       sudo provision-luks --target /dev/disk/by-id/... --confirm'
+      echo 'Default mode is read-only. --confirm is reserved for the audited provisioning workflow.'
+      exit 0
+      ;;
+    *) log_error "Unknown argument: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+require_root
+load_env
+if [[ -n "${CLI_TARGET}" ]]; then
+  TARGET_DISK="${CLI_TARGET}"
+fi
+validate_provision_profile || {
+  log_error 'Provisioning profile is incomplete or invalid.'
+  exit 1
+}
+assert_block_device "${TARGET_DISK}"
+assert_not_boot_disk "${TARGET_DISK}"
+metadata="$(disk_identity "${TARGET_DISK}")"
+fingerprint="$(disk_identity_fingerprint "${metadata}")"
+
+printf 'host_id=%s\n' "${HOST_ID}"
+printf 'target_fingerprint=%s\n' "${fingerprint}"
+printf '%s\n' "${metadata}"
+printf '%s\n' 'layout=GPT EFI + /boot + LUKS2 + LVM + XFS'
+printf 'efi_size=%s\n' "${EFI_SIZE}"
+printf 'boot_size=%s\n' "${BOOT_SIZE}"
+printf 'luks=cipher:%s key_size:%s pbkdf:%s\n' "${LUKS_CIPHER}" "${LUKS_KEY_SIZE}" "${LUKS_PBKDF}"
+printf 'lvm=vg:%s lv:%s\n' "${ROOT_VG}" "${ROOT_LV}"
+printf 'xfs=label:%s\n' "${ROOT_FS_LABEL}"
+printf '%s\n' 'planned_commands:'
+printf '%s\n' '  sgdisk --zap-all --clear --new=1:0:+EFI_SIZE --typecode=1:ef00 ...'
+printf '%s\n' '  wipefs --all TARGET'
+printf '%s\n' '  cryptsetup luksFormat --type luks2 --cipher aes-xts-plain64 --key-size 512 --pbkdf argon2id ...'
+printf '%s\n' '  cryptsetup open TARGET luks-root'
+printf '%s\n' '  pvcreate /dev/mapper/luks-root; vgcreate ROOT_VG /dev/mapper/luks-root'
+printf '%s\n' '  lvcreate; mkfs.xfs /dev/ROOT_VG/ROOT_LV'
+
+if ((DRY_RUN == 1)); then
+  log_info 'Dry run only; no device changes were made.'
+  exit 0
+fi
+
+require_audit_vault
+confirm_destructive "${TARGET_DISK}"
+log_error 'Destructive provisioning is not enabled in this slice.'
+exit 3
