@@ -18,6 +18,7 @@ REAL_USER="${SUDO_USER:-${USER}}"
 VAULT_UUID="${VAULT_UUID:-}"
 VAULT_MOUNTPOINT="${VAULT_MOUNTPOINT:-/mnt/Vault}"
 VAULT_SUBDIR="${VAULT_SUBDIR:-recovery-toolkit-vault}"
+VAULT_GROUP="$(id -gn "${REAL_USER}")"
 
 if [[ -z "${VAULT_UUID}" ]]; then
   log_error "VAULT_UUID is empty; set it in .env before configuring the vault."
@@ -43,7 +44,9 @@ mount_unit_path="/etc/systemd/system/${mount_unit}"
 udev_rule="/etc/udev/rules.d/61-recovery-vault.rules"
 
 mkdir -p "${VAULT_MOUNTPOINT}"
-chmod 0750 "${VAULT_MOUNTPOINT}"
+if ! mountpoint -q "${VAULT_MOUNTPOINT}"; then
+  chmod 0750 "${VAULT_MOUNTPOINT}"
+fi
 
 if [[ -e "${vault_device}" ]]; then
   vault_type="$(blkid -s TYPE -o value "${vault_device}" 2>/dev/null || true)"
@@ -55,6 +58,13 @@ if [[ -e "${vault_device}" ]]; then
   if [[ "$(readlink -f "${vault_device}")" == "$(readlink -f "${root_device}")" ]]; then
     log_error "Configured vault UUID resolves to the operating-system root device."
     exit 1
+  fi
+  if mountpoint -q "${VAULT_MOUNTPOINT}"; then
+    mounted_device="$(findmnt -no SOURCE "${VAULT_MOUNTPOINT}")"
+    if [[ "$(readlink -f "${mounted_device}")" != "$(readlink -f "${vault_device}")" ]]; then
+      log_error "${VAULT_MOUNTPOINT} is mounted from an unexpected device: ${mounted_device}"
+      exit 1
+    fi
   fi
 else
   log_warn "Vault device is not present; installing detection and waiting for unlock."
@@ -88,8 +98,10 @@ if [[ -e "${vault_device}" ]] && ! mountpoint -q "${VAULT_MOUNTPOINT}"; then
 fi
 
 if mountpoint -q "${VAULT_MOUNTPOINT}"; then
+  chown "root:${VAULT_GROUP}" "${VAULT_MOUNTPOINT}"
+  chmod 0750 "${VAULT_MOUNTPOINT}"
   vault_dir="${VAULT_MOUNTPOINT}/${VAULT_SUBDIR}"
-  install -d -m 0700 -o "${REAL_USER}" -g "$(id -gn "${REAL_USER}")" "${vault_dir}"
+  install -d -m 0700 -o "${REAL_USER}" -g "${VAULT_GROUP}" "${vault_dir}"
   log_info "Vault mounted at ${VAULT_MOUNTPOINT}; toolkit directory: ${vault_dir}"
 else
   log_info "Vault configuration installed; waiting for ${vault_device} to become available."
