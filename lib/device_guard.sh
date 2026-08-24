@@ -92,9 +92,13 @@ assert_target_root_is_safe() {
     log_error "Host target root does not exist: ${target_root}"
     return 1
   }
-  if [[ -n "${VAULT_MOUNTPOINT:-}" && "${target_root%/}" == "${VAULT_MOUNTPOINT%/}" ]]; then
-    log_error 'Host target root cannot be the configured vault mount.'
-    return 2
+  if [[ -n "${VAULT_MOUNTPOINT:-}" ]]; then
+    case "${target_root%/}/" in
+      "${VAULT_MOUNTPOINT%/}/"*)
+        log_error 'Host target root cannot be the configured vault mount or a child of it.'
+        return 2
+        ;;
+    esac
   fi
   mountpoint -q "${target_root}" || {
     log_error "Host target root is not a mountpoint: ${target_root}"

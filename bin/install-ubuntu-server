@@ -170,8 +170,13 @@ manifest_contents="$(printf '%s\n' \
   "luks_key_sha256=${key_sha256}" \
   "autoinstall_path=${autoinstall_path}" \
   "subiquity_exit_status=${installer_status}")"
-audit_record_event "${installer_relative}/manifest.env" "${manifest_contents}"
+manifest_status=0
+audit_record_event "${installer_relative}/manifest.env" "${manifest_contents}" || manifest_status=$?
 audit_finish "${installer_status}"
+if ((manifest_status != 0)); then
+  log_error 'Could not write the Ubuntu installer manifest to the vault.'
+  exit "${manifest_status}"
+fi
 if ((installer_status != 0)); then
   log_error "Ubuntu Server installation failed with status ${installer_status}."
   exit "${installer_status}"

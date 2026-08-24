@@ -20,9 +20,9 @@ you also want the shellcheck pre-commit hook.
 - `docs/` - usage notes per tool, plus LUKS layout planning
 - `data/` (gitignored) - per-script audit logs, generated LUKS keys/headers
 
-`data` is gitignored; each script under `bin/` appends timestamped entries to
-`data/logs/<script>.log` via `lib/common.sh` for auditability of historical
-actions applied to a machine (secure erases, key generation, etc).
+`data` is gitignored; host commands and deliberately invoked USB scripts append
+timestamped entries to `data/logs/<script>.log` via `lib/common.sh` for
+auditability of historical actions.
 
 The `.env` file is generated automatically from `.env.example` on first run
 (`make env` or `lib/common.sh`'s `load_env`); most configuration can be left
@@ -53,9 +53,10 @@ sudo make usb-overlay
 
 The Makefile prints the active root source/UUID and configured vault
 source/UUID before USB maintenance. `RECOVERY_USB_ROOT_UUID` can be set in
-`.env` to require an exact root UUID match. `VAULT_UUID` must identify a
-different physical disk; the vault-setup target is the only USB target that
-can proceed while the vault is not currently mounted.
+`.env` to require an exact root UUID match. When configured, `VAULT_UUID` must
+identify a different physical disk. `make usb-vault` requires that UUID;
+one-time package and USB maintenance targets can display an unconfigured or
+unmounted vault without writing to it.
 
 For the USB network setup, use the Makefile targets above:
 

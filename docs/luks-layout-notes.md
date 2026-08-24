@@ -41,20 +41,27 @@ will remain behind the vault audit gate and explicit identity confirmation.
 Use the following sequence during a host provisioning or recovery session:
 
 ```bash
-sudo setup-vault
+sudo make usb-preflight
+sudo make usb-vault
 sudo inspect-disk /dev/disk/by-id/<target>
+sudo hdd-secure-erase --target /dev/disk/by-id/<target>   # select the media-appropriate erase command
 sudo provision-luks --target /dev/disk/by-id/<target>
 sudo install-ubuntu-server --target /dev/disk/by-id/<target>
 sudo install-ubuntu-server --target /dev/disk/by-id/<target> --apply
+sudo mount <installed-host-root> /mnt/host
+sudo setup-initramfs-unlock --target-root /mnt/host
+sudo setup-initramfs-unlock --target-root /mnt/host --apply
+```
 
 If you are only maintaining the recovery USB itself, do not run the host
 provisioning commands. USB maintenance work stays separate and should not
 require rebooting the installer environment just to continue host deployment.
-```
+Use `make usb-*` only for deliberate changes to the recovery USB.
 
-Review the fingerprint and planned commands first. The future mutating path
-will require the vault to be mounted, the target fingerprint to be re-read and
-confirmed, and the explicit `NUKE` confirmation. Never use `/dev/sdX` as the
+Review the fingerprint and planned commands first. Mutating host operations
+require the vault to be mounted, the target fingerprint to be re-read and
+confirmed, and the explicit `NUKE` confirmation where disk destruction is
+involved. Never use `/dev/sdX` as the
 operator-facing target identifier.
 
 `install-ubuntu-server --apply` starts the official Ubuntu Server Subiquity
@@ -62,9 +69,9 @@ installer from the currently booted environment and points it at the
 vault-rendered autoinstall configuration. The configuration preserves the
 prepared encrypted root graph, formats only EFI and `/boot`, and uses the
 installer source already mounted at `/cdrom`. It does not modify the recovery
-USB. Do not run the current `setup-initramfs-unlock` command against the USB
-root after installation; the next implementation must accept the installed
-target root and rebuild that target's initramfs.
+USB. `setup-initramfs-unlock` is a host-facing command and requires the
+installed host root to be mounted explicitly with `--target-root`; it writes
+Dropbear files below that root and runs the rebuild through `chroot`.
 
 link to 
 [Hdd Secure Erase](./hdd-secure-erase.md)

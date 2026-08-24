@@ -37,7 +37,7 @@
 - Produces the command classification and Makefile target names used by later tasks.
 - Produces fixture assertions that fail if USB scripts are installed or if USB commands remain in `bin/`.
 
-- [ ] **Step 1: Write failing boundary assertions**
+- [x] **Step 1: Write failing boundary assertions**
 
 Add a shell fixture test that asserts:
 
@@ -57,7 +57,7 @@ Also assert that `make install` iterates only over `bin/*`, that the Makefile
 has explicit `usb-*` targets, and that the documentation says initramfs
 configuration targets the host root.
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -68,7 +68,7 @@ Run:
 Expected: FAIL because USB commands are still under `bin/` and the Makefile
 does not yet expose the USB maintenance boundary.
 
-- [ ] **Step 3: Update the boundary documentation and Makefile contract**
+- [x] **Step 3: Update the boundary documentation and Makefile contract**
 
 Document these commands:
 
@@ -89,7 +89,7 @@ maintenance targets, and the two UUIDs must differ. Keep `RECOVERY_DISK_UUID`
 as a compatibility alias only if existing profile validation requires it, and
 make the Makefile use one canonical value internally.
 
-- [ ] **Step 4: Run the focused test and verify it passes**
+- [x] **Step 4: Run the focused test and verify it passes**
 
 Run:
 
@@ -100,7 +100,7 @@ Run:
 Expected: PASS for the documented target names and the Makefile installation
 contract.
 
-- [ ] **Step 5: Commit the boundary contract**
+- [x] **Step 5: Commit the boundary contract**
 
 ```bash
 git add README.md .env.example docs/TODO.md docs/superpowers/specs/2026-08-24-encrypted-host-provisioning-design.md tests/test_tool_boundary.sh Makefile
@@ -123,7 +123,7 @@ git commit -m "Define USB and host tool boundaries"
 - `usb_context.sh` provides `usb_context_report`, `usb_require_make_context`, and `usb_validate_context`.
 - Host commands source `device_guard.sh`; USB scripts source `usb_context.sh`.
 
-- [ ] **Step 1: Write failing device and context fixtures**
+- [x] **Step 1: Write failing device and context fixtures**
 
 Use command stubs in temporary `PATH` to model a root source, vault source,
 partitions, and physical disks. Assert that `assert_not_protected_disk` rejects
@@ -134,7 +134,7 @@ execution and accepts the exact Makefile marker plus a valid target name.
 The fixture must not call `dd`, `wipefs`, `sgdisk`, `cryptsetup`, `mount`, or
 `update-initramfs`.
 
-- [ ] **Step 2: Run the focused fixtures and verify they fail**
+- [x] **Step 2: Run the focused fixtures and verify they fail**
 
 ```bash
 ./tests/test_device_guard.sh
@@ -143,7 +143,7 @@ The fixture must not call `dd`, `wipefs`, `sgdisk`, `cryptsetup`, `mount`, or
 
 Expected: FAIL because the new helpers do not exist.
 
-- [ ] **Step 3: Implement physical-disk resolution and fail-closed checks**
+- [x] **Step 3: Implement physical-disk resolution and fail-closed checks**
 
 Implement `device_guard.sh` so every source resolves to its physical `TYPE=disk`
 ancestor using `lsblk -s`. If the active root or vault source cannot resolve to
@@ -155,7 +155,7 @@ vault mount, and any target root that is not an absolute mounted directory.
 Keep `common.sh` responsible for loading `.env` and logging; source the focused
 guard from host commands rather than duplicating device logic.
 
-- [ ] **Step 4: Implement the Makefile-only USB context**
+- [x] **Step 4: Implement the Makefile-only USB context**
 
 `usb_context.sh` must:
 
@@ -164,12 +164,12 @@ guard from host commands rather than duplicating device logic.
 3. Resolve `VAULT_UUID` when present and print its device, filesystem UUID, and physical disk.
 4. Refuse matching root/vault disks or matching UUIDs.
 5. Refuse a configured `RECOVERY_USB_ROOT_UUID` mismatch.
-6. Require `RECOVERY_USB_MAKE_CONTEXT=1` and an allowlisted `RECOVERY_USB_MAKE_TARGET` for mutating USB scripts.
+6. Require `RECOVERY_USB_MAKE_CONTEXT=1` and an allowlisted `RECOVERY_USB_MAKE_TARGET` for mutating USB scripts. Require `VAULT_UUID` specifically for `usb-vault`; non-vault USB setup targets may report an absent vault because they do not write to it.
 
 The Makefile must pass the marker and target explicitly through `sudo env`.
 No USB script is symlinked into `/usr/local/bin`.
 
-- [ ] **Step 5: Run focused fixtures and repository checks**
+- [x] **Step 5: Run focused fixtures and repository checks**
 
 ```bash
 ./tests/test_device_guard.sh
@@ -179,7 +179,7 @@ shellcheck -x -P lib lib/device_guard.sh lib/usb_context.sh
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the safety libraries**
+- [x] **Step 6: Commit the safety libraries**
 
 ```bash
 git add lib/common.sh lib/device_guard.sh lib/usb_context.sh .env.example Makefile tests/test_device_guard.sh tests/test_tool_boundary.sh
@@ -207,14 +207,14 @@ git commit -m "Add protected disk and USB context guards"
 - Each script calls `usb_require_make_context` before mutating the running USB.
 - Makefile targets call the matching script with `RECOVERY_USB_MAKE_TARGET=$@`.
 
-- [ ] **Step 1: Extend tests for the moved scripts**
+- [x] **Step 1: Extend tests for the moved scripts**
 
 Change existing static assertions to point at `scripts/usb/`. Add assertions
 that each script calls `usb_require_make_context`, that no USB script appears
 in the symlink loop, and that direct `bash scripts/usb/setup-vault` exits before
 writing `/etc` when the Makefile marker is absent.
 
-- [ ] **Step 2: Run the focused tests and verify they fail**
+- [x] **Step 2: Run the focused tests and verify they fail**
 
 ```bash
 ./tests/test_setup_commands.sh
@@ -224,14 +224,14 @@ writing `/etc` when the Makefile marker is absent.
 Expected: FAIL because the scripts have not moved and do not have the USB
 context guard.
 
-- [ ] **Step 3: Move and adapt the scripts**
+- [x] **Step 3: Move and adapt the scripts**
 
 Move the five scripts under `scripts/usb/`, update their library paths, and
 call `usb_require_make_context` immediately after loading the environment and
 before any package, systemd, `/etc`, or boot-file mutation. Keep the scripts
 non-installed and invoke them with `bash` from Make targets.
 
-- [ ] **Step 4: Add explicit Makefile targets and stale-link cleanup**
+- [x] **Step 4: Add explicit Makefile targets and stale-link cleanup**
 
 Make `install` depend on `env` and host-only symlinks; it must not call the
 USB package installer. Make `usb-install` call only
@@ -245,7 +245,7 @@ the USB package installer. Update `bootstrap.sh` to call `make install` and
 then `make usb-install`, so a fresh USB still receives its packages without
 making the normal host-tool installation target ambiguous.
 
-- [ ] **Step 5: Run tests and shellcheck**
+- [x] **Step 5: Run tests and shellcheck**
 
 ```bash
 ./tests/test_setup_commands.sh
@@ -255,7 +255,7 @@ make check
 
 Expected: PASS, with no USB script installed into `/usr/local/bin`.
 
-- [ ] **Step 6: Commit the USB maintenance boundary**
+- [x] **Step 6: Commit the USB maintenance boundary**
 
 ```bash
 git add Makefile scripts/usb bin tests/test_setup_commands.sh tests/test_tool_boundary.sh docs/setup-overlay-boot.md docs/luks-layout-notes.md
@@ -280,7 +280,7 @@ git commit -m "Gate USB maintenance through Makefile"
 - `audit.sh` provides `audit_vault_path` and `audit_record_event` for vault writes under the operation directory.
 - Provisioning and installer commands use these helpers and do not redefine temporary-key paths or direct vault event directories.
 
-- [ ] **Step 1: Write failing key and vault-event tests**
+- [x] **Step 1: Write failing key and vault-event tests**
 
 Assert that runtime key files are created below `/dev/shm` with mode `0600`,
 that the helper returns only a checksum when requested, that cleanup removes
@@ -289,7 +289,7 @@ Assert that `audit_vault_path` refuses paths outside `AUDIT_ROOT` and that
 `audit_record_event` creates mode `0600` event records below the active
 operation directory.
 
-- [ ] **Step 2: Run focused tests and verify they fail**
+- [x] **Step 2: Run focused tests and verify they fail**
 
 ```bash
 ./tests/test_key_material.sh
@@ -299,20 +299,20 @@ operation directory.
 
 Expected: FAIL because the focused helpers do not exist.
 
-- [ ] **Step 3: Implement the helpers**
+- [x] **Step 3: Implement the helpers**
 
 Use `dd if=/dev/urandom` for generated LUKS material, `mktemp /dev/shm/...`
 for runtime staging, `install -m 0600` for copies, and traps for cleanup.
 Never print key contents. Make vault event paths derive from `AUDIT_ROOT` and
 reject traversal or absolute paths supplied by a command.
 
-- [ ] **Step 4: Refactor provisioning and installer commands**
+- [x] **Step 4: Refactor provisioning and installer commands**
 
 Replace inline key creation/copy/cleanup and direct evidence path construction
 with the shared helpers. Preserve existing dry-run defaults, target fingerprint
 confirmation, audit begin/finish, and installer behavior.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 ```bash
 ./tests/test_key_material.sh
@@ -338,7 +338,7 @@ git commit -m "Centralize key staging and vault events"
 - `initramfs_unlock_target_paths TARGET_ROOT` returns target-scoped config, authorized-key, and initramfs paths.
 - `install_initramfs_unlock_target TARGET_ROOT` writes the restricted files below the target and invokes `chroot TARGET_ROOT update-initramfs -u -k all` only after target validation.
 
-- [ ] **Step 1: Write failing target-root tests**
+- [x] **Step 1: Write failing target-root tests**
 
 Create a temporary target tree with `etc`, `boot`, and a mocked `update-initramfs`.
 Assert that dry-run prints the target paths without writing the USB or target,
@@ -349,7 +349,7 @@ an unmounted directory, and a target whose source is the active USB disk.
 Assert that the forced key contains `command="cryptroot-unlock"` and no shell
 forwarding features.
 
-- [ ] **Step 2: Run the focused tests and verify they fail**
+- [x] **Step 2: Run the focused tests and verify they fail**
 
 ```bash
 ./tests/test_initramfs_target.sh
@@ -359,7 +359,7 @@ forwarding features.
 Expected: FAIL because the command currently writes the running USB's `/etc`
 and has no target-root interface.
 
-- [ ] **Step 3: Implement target path validation and rendering**
+- [x] **Step 3: Implement target path validation and rendering**
 
 Keep `initramfs_unlock_dropbear_config` and
 `initramfs_unlock_authorized_key` pure. Add target path derivation that joins
@@ -367,7 +367,7 @@ validated relative paths to the target root without allowing an absolute
 override to escape it. Require the target root to be a mountpoint whose
 source is a block-backed filesystem distinct from the active root and vault.
 
-- [ ] **Step 4: Implement the host-targeted command**
+- [x] **Step 4: Implement the host-targeted command**
 
 Default to dry-run. On `--apply`, require root, the valid profile, the mounted
 target root, the vault audit gate, and the exact target identity confirmation.
@@ -377,7 +377,7 @@ target disk identity, key fingerprint, deployment checksum, and rebuild status
 in the vault. Never call `update-initramfs` without `chroot`, and never write
 the same paths under the running USB root.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 ```bash
 ./tests/test_initramfs_target.sh
@@ -400,7 +400,7 @@ git commit -m "Target initramfs unlock at installed host root"
 - Documentation exposes separate USB setup and host provisioning workflows.
 - The completed plan records the exact verification commands and results.
 
-- [ ] **Step 1: Update operator documentation**
+- [x] **Step 1: Update operator documentation**
 
 Document the safe sequence:
 
@@ -422,7 +422,7 @@ future host Dropbear service uses the host recovery address and port `2222`.
 State that inserting the USB and entering its passphrase is a separate manual
 security ceremony and is not part of host remote unlock.
 
-- [ ] **Step 2: Run the complete verification suite**
+- [x] **Step 2: Run the complete verification suite**
 
 ```bash
 make check
@@ -434,7 +434,7 @@ git status --short --branch
 Expected: all checks pass, `git diff --check` is silent, and only intended
 commits are present on the branch.
 
-- [ ] **Step 3: Review the final boundary statically**
+- [x] **Step 3: Review the final boundary statically**
 
 ```bash
 find bin -maxdepth 1 -type f -print | sort
@@ -445,7 +445,7 @@ rg -n 'scripts/usb|usb-preflight|RECOVERY_USB_MAKE_CONTEXT|target-root|update-in
 Confirm that `bin/` contains no USB-only command, no USB script is linked by
 the install loop, and no initramfs command can update the running USB root.
 
-- [ ] **Step 4: Commit documentation and push**
+- [x] **Step 4: Commit documentation and push**
 
 ```bash
 git add README.md docs/luks-layout-notes.md docs/TODO.md docs/superpowers/plans/2026-08-24-tool-boundary-refactor.md Makefile

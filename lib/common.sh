@@ -45,32 +45,6 @@ require_root() {
   fi
 }
 
-# Guard: Identify USB root disk and refuse execution against it
-assert_not_boot_disk() {
-  local target="$1"
-  
-  # Resolve symlinks (e.g., /dev/disk/by-id/...)
-  local real_target
-  real_target="$(readlink -f "${target}")"
-
-  # Find the underlying parent disk for the current root filesystem
-  local root_src
-  root_src="$(findmnt -n -o SOURCE /)"
-  local boot_disk boot_disk_name
-  boot_disk_name="$(lsblk -sno NAME,TYPE "${root_src}" 2>/dev/null | awk '$2 == "disk" { print $1; exit }' | LC_ALL=C tr -cd '[:alnum:]_-')"
-  boot_disk="/dev/${boot_disk_name}"
-
-  if [[ -z "${boot_disk}" || "${boot_disk}" == "/dev/" ]]; then
-    # Fallback if root is directly on a non-partitioned block
-    boot_disk="${root_src}"
-  fi
-
-  if [[ "${real_target}" == "${boot_disk}"* ]]; then
-    log_error "Safety violation: Target ${real_target} is the active boot USB (${boot_disk})!"
-    exit 2
-  fi
-}
-
 # Guard: Explicit destructive prompt
 confirm_destructive() {
   local target="$1"

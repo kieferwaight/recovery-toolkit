@@ -28,10 +28,10 @@ usb_context_report() {
   printf 'usb_root_disk=%s\n' "${root_disk}"
 
   vault_uuid="${VAULT_UUID:-}"
-  [[ -n "${vault_uuid}" ]] || {
-    log_error 'VAULT_UUID must be configured before USB maintenance.'
-    return 1
-  }
+  if [[ -z "${vault_uuid}" ]]; then
+    printf '%s\n' 'vault_uuid=not-configured'
+    return 0
+  fi
   vault_source="$(_configured_vault_source 2>/dev/null || true)"
   if [[ -n "${vault_source}" ]]; then
     vault_disk="$(physical_disk_for_source "${vault_source}")" || {
@@ -71,13 +71,8 @@ usb_validate_context() {
   fi
 
   vault_source="$(_configured_vault_source 2>/dev/null || true)"
-  if [[ "${target}" != 'usb-vault' && "${target}" != 'usb-preflight' && -z "${vault_source}" ]]; then
+  if [[ "${target}" == 'usb-vault' && -z "${vault_source}" ]]; then
     log_error "Vault device is required for USB target ${target}."
-    return 1
-  fi
-  if [[ "${target}" != 'usb-vault' && "${target}" != 'usb-preflight' ]] \
-    && ! mountpoint -q "${VAULT_MOUNTPOINT:-/mnt/Vault}"; then
-    log_error "Vault must be mounted for USB target ${target}."
     return 1
   fi
 }

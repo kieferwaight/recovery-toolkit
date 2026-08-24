@@ -95,6 +95,7 @@ if [[ "$fingerprint_confirm" != "$fingerprint" ]]; then
 fi
 
 audit_begin 'setup-initramfs-unlock' "$target_disk" "$metadata_confirm"
+TARGET_INITRAMFS_DEPLOYMENT_CHECKSUM=''
 set +e
 install_initramfs_unlock_target "$TARGET_ROOT"
 install_status=$?
@@ -111,8 +112,13 @@ manifest_contents="$(printf '%s\n' \
   "unlock_key_fingerprint=$RECOVERY_UNLOCK_KEY_FINGERPRINT" \
   "deployment_checksum=$deployment_checksum" \
   "initramfs_exit_status=$install_status")"
-audit_record_event "hosts/$HOST_ID/initramfs/$AUDIT_OPERATION_ID/manifest.env" "$manifest_contents"
+manifest_status=0
+audit_record_event "hosts/$HOST_ID/initramfs/$AUDIT_OPERATION_ID/manifest.env" "$manifest_contents" || manifest_status=$?
 audit_finish "$install_status"
+if ((manifest_status != 0)); then
+  log_error "Could not write the host initramfs manifest to the vault."
+  exit "$manifest_status"
+fi
 if ((install_status != 0)); then
   log_error "Host initramfs installation failed with status $install_status."
   exit "$install_status"

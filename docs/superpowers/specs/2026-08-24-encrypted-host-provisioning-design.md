@@ -52,7 +52,9 @@ provisioning therefore have different invocation surfaces:
   mount integration, SSH, and Tailscale setup.
 - USB maintenance scripts are not installed into `PATH` and are invoked only
   through explicit `make usb-*` targets. The Makefile prints and validates the
-  active USB root UUID and configured vault UUID before any USB mutation.
+  active USB root UUID and configured vault UUID before any USB mutation. A
+  vault UUID is required for `make usb-vault`; package/setup operations may
+  display an unconfigured or unmounted vault because they do not write to it.
 - `make install` installs only host-facing commands. One-time USB setup is a
   separate Makefile operation.
 

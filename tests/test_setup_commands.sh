@@ -24,7 +24,6 @@ assert_contains "${repo_dir}/scripts/usb/setup-vault" 'ID_FS_UUID'
 assert_contains "${repo_dir}/scripts/usb/setup-vault" 'BindsTo='
 assert_contains "${repo_dir}/scripts/usb/setup-vault" 'noatime,lazytime,nosuid,nodev'
 assert_contains "${repo_dir}/lib/common.sh" 'recovery_profile.sh'
-assert_contains "${repo_dir}/lib/common.sh" 'lsblk -sno NAME,TYPE'
 for usb_script in optimize-usb setup-overlay-boot setup-ssh setup-tailscale setup-vault install-packages; do
   assert_contains "${repo_dir}/scripts/usb/${usb_script}" 'usb_require_make_context'
 done

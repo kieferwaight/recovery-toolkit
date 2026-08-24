@@ -48,11 +48,20 @@ initramfs_unlock_authorized_key() {
 
 initramfs_unlock_target_paths() {
   local target_root="$1"
+  local configured_path
   load_initramfs_unlock_profile
-  [[ "${INITRAMFS_DROPBEAR_DIR}" == /* && "${INITRAMFS_DROPBEAR_DIR}" != *$'\n'* ]] || {
-    log_error 'Initramfs Dropbear directory must be an absolute path without newlines.'
-    return 1
-  }
+  for configured_path in "${INITRAMFS_DROPBEAR_DIR}" "${INITRAMFS_DROPBEAR_CONFIG}" "${INITRAMFS_DROPBEAR_AUTH_KEYS}"; do
+    [[ "${configured_path}" == /* && "${configured_path}" != *$'\n'* && "${configured_path}" != *$'\r'* ]] || {
+      log_error 'Initramfs paths must be absolute and single-line.'
+      return 1
+    }
+    case "/${configured_path}/" in
+      */../*|*/./*)
+        log_error 'Initramfs paths cannot contain traversal components.'
+        return 1
+        ;;
+    esac
+  done
   assert_target_root_is_safe "${target_root}" || return $?
   TARGET_ROOT="${target_root%/}"
   TARGET_INITRAMFS_DROPBEAR_DIR="${TARGET_ROOT}${INITRAMFS_DROPBEAR_DIR}"

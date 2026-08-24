@@ -9,8 +9,11 @@ USB can be dropped into ephemeral "provisioning" use without risking wear or
 data leakage, while still allowing a persistent mode for maintenance.
 
 ```
-sudo setup-overlay-boot
+sudo make usb-overlay
 ```
+
+Direct execution of the script under `scripts/usb/` is rejected; the Makefile
+preflight prints the active USB root and vault identities first.
 
 ## Behavior
 1. Installs `overlayroot` and configures it to use a tmpfs overlay
