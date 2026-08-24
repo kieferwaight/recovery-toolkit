@@ -2,25 +2,38 @@
 set -euo pipefail
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
-while [[ -L "${SCRIPT_PATH}" ]]; do
-  SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
-  SCRIPT_PATH="$(readlink "${SCRIPT_PATH}")"
-  [[ "${SCRIPT_PATH}" != /* ]] && SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_PATH}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
 done
-SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 # shellcheck source=../lib/common.sh
-source "${SCRIPT_DIR}/../lib/common.sh"
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../lib/device_guard.sh
+source "$SCRIPT_DIR/../lib/device_guard.sh"
+# shellcheck source=../lib/audit.sh
+source "$SCRIPT_DIR/../lib/audit.sh"
+# shellcheck source=../lib/disk_identity.sh
+source "$SCRIPT_DIR/../lib/disk_identity.sh"
 # shellcheck source=../lib/initramfs_unlock.sh
-source "${SCRIPT_DIR}/../lib/initramfs_unlock.sh"
+source "$SCRIPT_DIR/../lib/initramfs_unlock.sh"
 
+TARGET_ROOT=''
 APPLY=0
-while [[ "$#" -gt 0 ]]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) APPLY=1 ;;
     --dry-run) APPLY=0 ;;
+    --target-root)
+      [[ $# -ge 2 ]] || { log_error '--target-root requires a value.'; exit 1; }
+      TARGET_ROOT="$2"
+      shift
+      ;;
     -h|--help)
-      echo 'Usage: sudo setup-initramfs-unlock [--dry-run|--apply]'
-      echo 'Default mode prints the Dropbear initramfs configuration plan.'
+      echo 'Usage: sudo setup-initramfs-unlock --target-root /mnt/host [--dry-run|--apply]'
+      echo 'Default mode prints the host-targeted Dropbear initramfs plan.'
+      echo '--apply writes only below the explicit mounted host root and rebuilds its initramfs.'
       exit 0
       ;;
     *) log_error "Unknown argument: $1"; exit 1 ;;
@@ -30,27 +43,78 @@ done
 
 require_root
 load_env
+[[ -n "$TARGET_ROOT" ]] || {
+  log_error 'An explicit --target-root is required; the running USB root is never an implicit target.'
+  exit 1
+}
 validate_initramfs_unlock_profile || {
   log_error 'Initramfs unlock profile is incomplete or invalid.'
   exit 1
 }
+initramfs_unlock_target_paths "$TARGET_ROOT" || {
+  log_error 'Host target root is unsafe or unavailable.'
+  exit 1
+}
 
-printf 'recovery_interface=%s\n' "${RECOVERY_INTERFACE}"
-printf 'recovery_host_ip=%s\n' "${RECOVERY_HOST_IP}"
-printf 'recovery_gateway=%s\n' "${RECOVERY_GATEWAY}"
-printf 'recovery_subnet=%s\n' "${RECOVERY_SUBNET}"
-printf 'recovery_ssh_port=%s\n' "${RECOVERY_SSH_PORT}"
-printf 'initramfs_dropbear_config=%s\n' "${INITRAMFS_DROPBEAR_CONFIG}"
-printf '%s\n' 'dropbear_options=-s -j -k -I 60'
+target_source="$(findmnt -n -o SOURCE --target "$TARGET_ROOT")"
+target_disk="$(physical_disk_for_source "$target_source")"
+HOST_ID="$(printenv HOST_ID 2>/dev/null || true)"
+if [[ -z "$HOST_ID" ]]; then
+  HOST_ID="$(hostname -s)"
+fi
+
+printf 'host_id=%s\n' "$HOST_ID"
+printf 'target_root=%s\n' "$TARGET_ROOT"
+printf 'target_source=%s\n' "$target_source"
+printf 'target_disk=%s\n' "$target_disk"
+printf 'initramfs_dropbear_config=%s\n' "$TARGET_INITRAMFS_DROPBEAR_CONFIG"
+printf 'initramfs_dropbear_authorized_keys=%s\n' "$TARGET_INITRAMFS_DROPBEAR_AUTH_KEYS"
+printf 'recovery_host_ip=%s\n' "$RECOVERY_HOST_IP"
+printf 'recovery_ssh_port=%s\n' "$RECOVERY_SSH_PORT"
 printf '%s\n' 'authorized_keys entry: forced cryptroot-unlock only'
 
 if ((APPLY == 0)); then
-  log_info 'Dry run only; no initramfs files were written.'
+  log_info 'Dry run only; no target root or recovery USB files were written.'
   exit 0
 fi
 
-install -d -m 0700 "${INITRAMFS_DROPBEAR_DIR}"
-initramfs_unlock_dropbear_config > "${INITRAMFS_DROPBEAR_CONFIG}"
-initramfs_unlock_authorized_key "${RECOVERY_UNLOCK_KEY}" > "${INITRAMFS_DROPBEAR_AUTH_KEYS}"
-chmod 0600 "${INITRAMFS_DROPBEAR_CONFIG}" "${INITRAMFS_DROPBEAR_AUTH_KEYS}"
-log_info "Wrote initramfs Dropbear config to ${INITRAMFS_DROPBEAR_DIR}."
+require_audit_vault
+metadata="$(disk_identity "$target_disk")"
+fingerprint="$(disk_identity_fingerprint "$metadata")"
+printf 'target_fingerprint=%s\n' "$fingerprint"
+read -rp "Type target fingerprint '$fingerprint' to authorize host initramfs installation: " fingerprint_response
+if [[ "$fingerprint_response" != "$fingerprint" ]]; then
+  log_info 'Host initramfs installation canceled: target fingerprint did not match.'
+  exit 0
+fi
+metadata_confirm="$(disk_identity "$target_disk")"
+fingerprint_confirm="$(disk_identity_fingerprint "$metadata_confirm")"
+if [[ "$fingerprint_confirm" != "$fingerprint" ]]; then
+  log_error 'Target identity changed after confirmation; refusing initramfs installation.'
+  exit 2
+fi
+
+audit_begin 'setup-initramfs-unlock' "$target_disk" "$metadata_confirm"
+set +e
+install_initramfs_unlock_target "$TARGET_ROOT"
+install_status=$?
+set -e
+deployment_checksum="$TARGET_INITRAMFS_DEPLOYMENT_CHECKSUM"
+if [[ -z "$deployment_checksum" ]]; then
+  deployment_checksum='unavailable'
+fi
+manifest_contents="$(printf '%s\n' \
+  "host_id=$HOST_ID" \
+  "target_root=$TARGET_ROOT" \
+  "target_disk=$target_disk" \
+  "target_fingerprint=$fingerprint" \
+  "unlock_key_fingerprint=$RECOVERY_UNLOCK_KEY_FINGERPRINT" \
+  "deployment_checksum=$deployment_checksum" \
+  "initramfs_exit_status=$install_status")"
+audit_record_event "hosts/$HOST_ID/initramfs/$AUDIT_OPERATION_ID/manifest.env" "$manifest_contents"
+audit_finish "$install_status"
+if ((install_status != 0)); then
+  log_error "Host initramfs installation failed with status $install_status."
+  exit "$install_status"
+fi
+log_info "Host Dropbear initramfs configuration installed for $HOST_ID."

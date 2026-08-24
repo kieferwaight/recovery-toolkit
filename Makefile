@@ -104,5 +104,7 @@ test:
 	bash ./tests/test_key_material.sh
 	@echo "==> Running initramfs unlock tests..."
 	bash ./tests/test_initramfs_unlock.sh
+	@echo "==> Running target initramfs tests..."
+	bash ./tests/test_initramfs_target.sh
 	@echo "==> Running Ubuntu installer tests..."
 	bash ./tests/test_ubuntu_install.sh
