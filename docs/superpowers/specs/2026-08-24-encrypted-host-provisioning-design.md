@@ -38,6 +38,38 @@ DHCP-backed but reserved as `10.0.40.2` on `10.0.40.0/24`.
   installation.
 - Replacing Ubuntu Server's Subiquity/Curtin installer with `debootstrap`.
 
+## Tool boundary and invocation model
+
+The recovery USB is itself an encrypted, hands-on recovery appliance. Its
+boot-time passphrase unlocks the USB before the toolkit can run; the USB does
+not receive the host's remote-unlock configuration. USB maintenance and host
+provisioning therefore have different invocation surfaces:
+
+- `bin/` contains only commands that inspect, erase, prepare, install, or
+  configure a selected host target.
+- `scripts/usb/` contains commands that modify the currently running recovery
+  USB, including its packages, root filesystem, boot configuration, vault
+  mount integration, SSH, and Tailscale setup.
+- USB maintenance scripts are not installed into `PATH` and are invoked only
+  through explicit `make usb-*` targets. The Makefile prints and validates the
+  active USB root UUID and configured vault UUID before any USB mutation.
+- `make install` installs only host-facing commands. One-time USB setup is a
+  separate Makefile operation.
+
+The host initramfs unlock command remains host-facing in `bin/`. It must
+require an explicit mounted host root such as `/mnt/host`; it never writes the
+running USB's `/etc`, `/boot`, or initramfs. It installs the restricted
+Dropbear files under that target root and rebuilds the target initramfs from
+the recovery environment. The command refuses the active root, the vault,
+unmounted paths, and ambiguous target layouts.
+
+Every host-facing disk command rejects the physical disk backing the active
+root and the physical disk backing the configured vault. Vault reads and
+writes are explicit audited events, not incidental command output. Shared
+logging, path resolution, protected-device checks, and key-material staging
+remain in focused shell libraries so individual commands cannot redefine
+their safety policy.
+
 ## Recovery network profiles
 
 Each host gets a profile containing:
@@ -197,15 +229,20 @@ secret contents into metadata.
    backup.
 5. Add the Subiquity/autoinstall host installation handoff.
 6. Add Dropbear/initramfs configuration and restricted unlock-key deployment
-   against the installed host root.
+   against an explicitly mounted installed host root, never the recovery USB.
 7. Build an end-to-end `slinky` test with a non-production target disk.
 8. Revisit and harden the overlay boot mode only after recovery succeeds.
 
 ## Verification requirements
 
 - Unit/fixture tests cover profile validation, audit refusal, identity
-  serialization, key-file permissions, and forced-command generation.
+  serialization, key-file permissions, forced-command generation, and the
+  USB/host directory boundary.
 - Shellcheck and repository tests pass.
+- Direct USB script execution fails without the Makefile maintenance context.
+- Host commands refuse the active root disk and the configured vault disk.
+- Host initramfs configuration writes only below the explicit target root and
+  rebuilds that target's initramfs.
 - A live test proves the vault gate refuses when the vault is absent.
 - A live test proves the gate records a harmless read-only target inspection.
 - A live test proves Dropbear is bound to the expected address and port and
