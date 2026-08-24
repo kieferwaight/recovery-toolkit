@@ -69,6 +69,9 @@ grep -Fq 'subiquity' "${installer_bin}"
 grep -Fq -- '--autoinstall' "${installer_bin}"
 grep -Fq 'require_audit_vault' "${installer_bin}"
 grep -Fq 'audit_finish' "${installer_bin}"
+grep -Fq 'copy_secret_to_runtime' "${installer_bin}"
+grep -Fq 'audit_vault_path' "${installer_bin}"
+grep -Fq 'secret_sha256' "${installer_bin}"
 grep -Fq 'DRY_RUN=1' "${installer_bin}"
 if grep -Eq 'reboot|kexec' "${installer_bin}"; then
   echo 'installer command must not reboot or kexec' >&2

@@ -100,6 +100,8 @@ test:
 	bash ./tests/test_disk_identity.sh
 	@echo "==> Running provisioning profile tests..."
 	bash ./tests/test_provision_luks.sh
+	@echo "==> Running key material tests..."
+	bash ./tests/test_key_material.sh
 	@echo "==> Running initramfs unlock tests..."
 	bash ./tests/test_initramfs_unlock.sh
 	@echo "==> Running Ubuntu installer tests..."

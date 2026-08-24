@@ -123,3 +123,30 @@ audit_finish() {
     printf 'status=%s\n' "${status}"
   } >>"${AUDIT_RECORD}"
 }
+
+audit_vault_path() {
+  local relative="$1"
+  [[ -n "${AUDIT_ROOT:-}" ]] || return 1
+  [[ "${relative}" != /* && "${relative}" != *$'\n'* && "${relative}" != *$'\r'* ]] || return 1
+  case "/${relative}/" in
+    */../*|*/./*) return 1 ;;
+  esac
+  printf '%s/%s\n' "${AUDIT_ROOT%/}" "${relative}"
+}
+
+audit_record_event() {
+  local relative="$1"
+  local contents="$2"
+  local destination temporary
+
+  destination="$(audit_vault_path "${relative}")" || return 1
+  mkdir -p "$(dirname "${destination}")"
+  temporary="${destination}.tmp.$$"
+  umask 077
+  if ! printf '%s\n' "${contents}" >"${temporary}"; then
+    rm -f "${temporary}"
+    return 1
+  fi
+  chmod 0600 "${temporary}"
+  mv -f "${temporary}" "${destination}"
+}

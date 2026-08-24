@@ -14,6 +14,8 @@ source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/device_guard.sh"
 # shellcheck source=../lib/audit.sh
 source "${SCRIPT_DIR}/../lib/audit.sh"
+# shellcheck source=../lib/key_material.sh
+source "${SCRIPT_DIR}/../lib/key_material.sh"
 # shellcheck source=../lib/disk_identity.sh
 source "${SCRIPT_DIR}/../lib/disk_identity.sh"
 # shellcheck source=../lib/ubuntu_install.sh
@@ -140,28 +142,26 @@ command -v subiquity >/dev/null 2>&1 || {
 
 source_sha256="$(sha256sum "${source_squashfs}" | awk '{print $1}')"
 audit_begin 'install-ubuntu-server' "${TARGET_DISK}" "${metadata_confirm}"
-installer_root="${AUDIT_ROOT}/hosts/${HOST_ID}/installer/${AUDIT_OPERATION_ID}"
-autoinstall_path="${installer_root}/autoinstall.yaml"
-manifest_path="${installer_root}/manifest.env"
+installer_relative="hosts/${HOST_ID}/installer/${AUDIT_OPERATION_ID}"
+installer_root="$(audit_vault_path "${installer_relative}")"
+autoinstall_path="$(audit_vault_path "${installer_relative}/autoinstall.yaml")"
 mkdir -p "${installer_root}"
 umask 077
-runtime_key_file="$(mktemp /dev/shm/recovery-ubuntu-luks-key.XXXXXX)"
+runtime_key_file="$(copy_secret_to_runtime "${UBUNTU_LUKS_KEY_FILE}" 'recovery-ubuntu-luks-key')"
 runtime_config="$(mktemp /dev/shm/recovery-ubuntu-autoinstall.XXXXXX)"
-trap 'rm -f "${runtime_key_file:-}" "${runtime_config:-}"' EXIT
-cp --preserve=mode "${UBUNTU_LUKS_KEY_FILE}" "${runtime_key_file}"
-chmod 0600 "${runtime_key_file}"
+trap 'if [[ -n "${runtime_key_file:-}" ]]; then cleanup_runtime_secret "${runtime_key_file}"; fi; rm -f "${runtime_config:-}"' EXIT
 render_ubuntu_autoinstall "${efi_size_bytes}" "${boot_size_bytes}" "${crypt_size_bytes}" "${runtime_key_file}" >"${runtime_config}"
 chmod 0600 "${runtime_config}"
 install -m 0600 "${runtime_config}" "${autoinstall_path}"
 config_sha256="$(sha256sum "${autoinstall_path}" | awk '{print $1}')"
-key_sha256="$(sha256sum "${runtime_key_file}" | awk '{print $1}')"
+key_sha256="$(secret_sha256 "${runtime_key_file}")"
 
 set +e
 subiquity --autoinstall "${autoinstall_path}"
 installer_status=$?
 set -e
 
-printf '%s\n' \
+manifest_contents="$(printf '%s\n' \
   "host_id=${HOST_ID}" \
   "target_fingerprint=${fingerprint}" \
   "installer_source=${UBUNTU_INSTALLER_SOURCE}" \
@@ -169,8 +169,8 @@ printf '%s\n' \
   "autoinstall_sha256=${config_sha256}" \
   "luks_key_sha256=${key_sha256}" \
   "autoinstall_path=${autoinstall_path}" \
-  "subiquity_exit_status=${installer_status}" >"${manifest_path}"
-chmod 0600 "${manifest_path}"
+  "subiquity_exit_status=${installer_status}")"
+audit_record_event "${installer_relative}/manifest.env" "${manifest_contents}"
 audit_finish "${installer_status}"
 if ((installer_status != 0)); then
   log_error "Ubuntu Server installation failed with status ${installer_status}."
