@@ -10,6 +10,8 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/audit.sh
+source "${SCRIPT_DIR}/../lib/audit.sh"
 
 TARGET="${1:-}"
 
@@ -28,7 +30,16 @@ log_info "Targeting: ${TARGET}"
 nvme id-ctrl "${TARGET}" -H | grep -i sanitize || true
 
 confirm_destructive "${TARGET}"
+require_audit_vault
+target_metadata="$(audit_target_identity "${TARGET}")"
+audit_begin 'nvme-secure-erase' "${TARGET}" "${target_metadata}"
 
 log_info "Issuing crypto erase via nvme format..."
-nvme format "${TARGET}" --namespace-id=1 --ses=1
+erase_status=0
+nvme format "${TARGET}" --namespace-id=1 --ses=1 || erase_status=$?
+audit_finish "${erase_status}"
+if ((erase_status != 0)); then
+  log_error "NVMe secure erase failed on ${TARGET}."
+  exit "${erase_status}"
+fi
 log_info "Sanitize complete on ${TARGET}."

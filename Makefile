@@ -41,3 +41,9 @@ check:
 test:
 	@echo "==> Running setup command tests..."
 	./tests/test_setup_commands.sh
+	@echo "==> Running recovery profile tests..."
+	./tests/test_recovery_profile.sh
+	@echo "==> Running audit tests..."
+	./tests/test_audit.sh
+	@echo "==> Running secure erase audit contract..."
+	./tests/test_secure_erase_audit.sh

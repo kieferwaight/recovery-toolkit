@@ -1,5 +1,11 @@
 # hdd-secure-erase
 
+Before running this destructive command, configure and unlock the separate
+vault with `setup-vault`. The command fails closed unless it can capture the
+target identity and write a `planned` audit record to the UUID-bound vault.
+Completion or failure, including the utility exit status, is recorded after
+the operation. Plaintext keys and secrets are never written to the record.
+
 Securely erases a rotational (spinning) hard disk before it is repurposed or
 decommissioned.
 

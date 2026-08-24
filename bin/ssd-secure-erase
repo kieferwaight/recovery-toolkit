@@ -10,6 +10,8 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/audit.sh
+source "${SCRIPT_DIR}/../lib/audit.sh"
 
 TARGET="${1:-}"
 
@@ -32,18 +34,29 @@ log_info "Targeting: ${TARGET}"
 hdparm -I "${TARGET}" 2>/dev/null | grep -iA3 "Security:" || true
 
 confirm_destructive "${TARGET}"
+require_audit_vault
+target_metadata="$(audit_target_identity "${TARGET}")"
+audit_begin 'ssd-secure-erase' "${TARGET}" "${target_metadata}"
 
+erase_status=0
 if hdparm -I "${TARGET}" 2>/dev/null | grep -qi "supported$"; then
   log_info "ATA secure erase supported. Setting temporary security password..."
-  hdparm --user-master u --security-set-pass RecoveryUSB "${TARGET}"
-  log_info "Issuing secure erase..."
-  hdparm --user-master u --security-erase RecoveryUSB "${TARGET}"
+  hdparm --user-master u --security-set-pass RecoveryUSB "${TARGET}" || erase_status=$?
+  if ((erase_status == 0)); then
+    log_info "Issuing secure erase..."
+    hdparm --user-master u --security-erase RecoveryUSB "${TARGET}" || erase_status=$?
+  fi
 elif command -v blkdiscard >/dev/null 2>&1 && blkdiscard --secure --dry-run "${TARGET}" >/dev/null 2>&1; then
   log_warn "ATA secure erase not supported. Falling back to blkdiscard --secure (TRIM-based)."
-  blkdiscard --secure "${TARGET}"
+  blkdiscard --secure "${TARGET}" || erase_status=$?
 else
   log_warn "No secure erase method reported as supported. Falling back to a single-pass overwrite."
-  shred -v -n 1 "${TARGET}"
+  shred -v -n 1 "${TARGET}" || erase_status=$?
 fi
 
+audit_finish "${erase_status}"
+if ((erase_status != 0)); then
+  log_error "Secure erase failed on ${TARGET}."
+  exit "${erase_status}"
+fi
 log_info "Secure erase complete on ${TARGET}."
