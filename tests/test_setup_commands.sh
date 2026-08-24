@@ -22,9 +22,19 @@ assert_contains "${repo_dir}/bin/optimize-usb" 'backup_dir="/root/recovery-toolk
 assert_contains "${repo_dir}/bin/optimize-usb" 'apt-get purge -y snapd'
 assert_contains "${repo_dir}/bin/optimize-usb" 'vm.dirty_background_bytes = 67108864'
 assert_contains "${repo_dir}/bin/optimize-usb" 'tmpfs /var/cache/apt'
+assert_contains "${repo_dir}/bin/optimize-usb" 'tmpfs /var/lib/apt/lists'
+assert_contains "${repo_dir}/bin/optimize-usb" '60-usb-scheduler.rules'
+assert_contains "${repo_dir}/bin/optimize-usb" 'ATTR{queue/read_ahead_kb}="1024"'
+assert_contains "${repo_dir}/bin/optimize-usb" 'systemctl mask --now'
 assert_contains "${repo_dir}/bin/optimize-usb" 'commit=60'
 if grep -Fq 'systemctl mask' "${repo_dir}/bin/optimize-usb"; then
-  echo "optimizer must not mask services" >&2
+  if grep -Fq 'thermald.service' "${repo_dir}/bin/optimize-usb"; then
+    echo "optimizer must not mask thermald" >&2
+    exit 1
+  fi
+fi
+if grep -Eq 'data=writeback|force-unsafe-io|min_free_kbytes' "${repo_dir}/bin/optimize-usb"; then
+  echo "optimizer must not enable unreviewed unsafe I/O settings" >&2
   exit 1
 fi
 

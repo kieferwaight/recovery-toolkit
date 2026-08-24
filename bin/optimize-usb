@@ -29,6 +29,10 @@ for unit in snapd.service snapd.socket snapd.seeded.service fwupd-refresh.timer 
   packagekit.service; do
   systemctl disable --now "${unit}" 2>/dev/null || true
 done
+systemctl mask --now cloud-init.service cloud-init-local.service cloud-config.service \
+  cloud-final.service ubuntu-advantage.service ubuntu-report.service \
+  apport.service apport-autoreflink.service motd-news.timer motd-news.service \
+  multipathd.service multipathd.socket 2>/dev/null || true
 
 if dpkg-query -W -f='${Status}' snapd 2>/dev/null | grep -q 'install ok installed'; then
   log_info "Removing unused snapd..."
@@ -47,6 +51,18 @@ fi
 if ! grep -Eq '^[[:space:]]*tmpfs[[:space:]]+/var/cache/apt[[:space:]]' /etc/fstab; then
   printf '%s\n' 'tmpfs /var/cache/apt tmpfs defaults,size=1G,mode=0755,nosuid,nodev 0 0' >> /etc/fstab
 fi
+if ! grep -Eq '^[[:space:]]*tmpfs[[:space:]]+/var/lib/apt/lists[[:space:]]' /etc/fstab; then
+  printf '%s\n' 'tmpfs /var/lib/apt/lists tmpfs defaults,size=512M,mode=0755,nosuid,nodev 0 0' >> /etc/fstab
+fi
+
+log_info "Configuring removable USB scheduling and readahead..."
+mkdir -p /etc/udev/rules.d
+cat > /etc/udev/rules.d/60-usb-scheduler.rules <<'EOF'
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{removable}=="1", ATTR{queue/scheduler}="none"
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{removable}=="1", ATTR{queue/read_ahead_kb}="1024"
+EOF
+udevadm control --reload-rules
+udevadm trigger --subsystem-match=block || true
 
 swapoff -a || true
 awk '
@@ -84,7 +100,11 @@ EOF
 
 sysctl --system >/dev/null
 mount -o remount,rw,noatime,lazytime,commit=60 /
+apt_lists_stage="$(mktemp -d)"
+cp -a /var/lib/apt/lists/. "${apt_lists_stage}/" 2>/dev/null || true
 mount -a
+cp -a "${apt_lists_stage}/." /var/lib/apt/lists/ 2>/dev/null || true
+rm -rf "${apt_lists_stage}"
 systemctl daemon-reload
 systemctl restart systemd-journald
 

@@ -51,6 +51,10 @@ disables background update/telemetry services, moves temporary paths into
 tmpfs, disables swap, and bounds delayed writeback. The profile prioritizes
 interactive performance and USB wear reduction over persistence; the root
 filesystem may lose up to 60 seconds of recent writes after sudden power loss.
+The optimizer also keeps APT lists in RAM and sets removable USB readahead to
+1024 KiB. It deliberately retains `thermald` and does not enable ext4
+`data=writeback` or global unsafe dpkg I/O, preserving thermal protection and
+package/database integrity.
 
 See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
 LUKS key/header storage and disk identification.
