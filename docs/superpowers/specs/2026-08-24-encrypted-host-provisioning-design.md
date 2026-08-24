@@ -34,6 +34,9 @@ DHCP-backed but reserved as `10.0.40.2` on `10.0.40.0/24`.
 - Assuming overwrite can erase hidden SSD/NVMe overprovisioned blocks.
 - Implementing the RAM overlay boot mode before the provisioning and recovery
   workflow is tested.
+- Rebuilding or modifying the recovery USB installer media during host
+  installation.
+- Replacing Ubuntu Server's Subiquity/Curtin installer with `debootstrap`.
 
 ## Recovery network profiles
 
@@ -137,6 +140,30 @@ The command records the result, exit status, timestamps, and checksums after
 the operation. Secrets are excluded from human-readable logs; key material is
 referenced by stable IDs and hashes.
 
+## Ubuntu Server installer handoff
+
+The recovery USB is already running the Ubuntu Server environment that will be
+installed on the host. The host installer command uses Subiquity's documented
+`--autoinstall <path>` entry point from that running environment, so the normal
+Ubuntu Server image and installer backend remain responsible for populating the
+target. The toolkit does not copy the live USB root filesystem and does not
+rebuild the USB.
+
+The generated autoinstall file is written only to the mounted vault with mode
+`0600`. It contains the stable target path, the preserved GPT partition/LUKS2/
+LVM/XFS storage graph, the vault path of the LUKS key file, and the operator's
+host identity settings. The LUKS key contents are never inserted into YAML or
+logs. Subiquity and its Curtin backend format the EFI and `/boot` partitions,
+reuse the pre-created encrypted root graph, and populate the target from the
+currently mounted installer source (normally `/cdrom`).
+
+`install-ubuntu-server` is read-only by default. The mutating path requires the
+vault audit gate, a stable target identity re-read, an exact fingerprint
+confirmation, and an explicit `--apply`. It records the rendered config hash,
+installer source identity, target fingerprint, and Subiquity exit status in the
+vault. It never invokes a reboot and never writes to the recovery USB's boot
+configuration.
+
 ## Evidence record
 
 Each host gets a vault directory such as:
@@ -167,9 +194,11 @@ secret contents into metadata.
 3. Add disk discovery, sanitization selection, and pre/post evidence records.
 4. Add LUKS2/LVM/XFS provisioning with protected key generation and header
    backup.
-5. Add Dropbear/initramfs configuration and restricted unlock-key deployment.
-6. Build an end-to-end `slinky` test with a non-production target disk.
-7. Revisit and harden the overlay boot mode only after recovery succeeds.
+5. Add the Subiquity/autoinstall host installation handoff.
+6. Add Dropbear/initramfs configuration and restricted unlock-key deployment
+   against the installed host root.
+7. Build an end-to-end `slinky` test with a non-production target disk.
+8. Revisit and harden the overlay boot mode only after recovery succeeds.
 
 ## Verification requirements
 
