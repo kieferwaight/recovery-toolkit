@@ -23,6 +23,7 @@ assert_contains "${repo_dir}/bin/setup-vault" 'systemd-escape --path --suffix=mo
 assert_contains "${repo_dir}/bin/setup-vault" 'ID_FS_UUID'
 assert_contains "${repo_dir}/bin/setup-vault" 'BindsTo='
 assert_contains "${repo_dir}/bin/setup-vault" 'noatime,lazytime,nosuid,nodev'
+assert_contains "${repo_dir}/lib/common.sh" 'recovery_profile.sh'
 if grep -Fq '/etc/fstab' "${repo_dir}/bin/setup-vault"; then
   echo "vault setup must not use fstab" >&2
   exit 1

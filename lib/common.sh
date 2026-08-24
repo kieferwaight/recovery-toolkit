@@ -103,3 +103,6 @@ is_rotational() {
   cat "/sys/block/${base}/queue/rotational" 2>/dev/null || echo 1
 }
 
+# Recovery networking is optional for commands that do not use initramfs.
+# shellcheck source=recovery_profile.sh
+source "${REPO_ROOT}/lib/recovery_profile.sh"
