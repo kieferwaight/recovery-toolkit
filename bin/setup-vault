@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "${SCRIPT_PATH}" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+  SCRIPT_PATH="$(readlink "${SCRIPT_PATH}")"
+  [[ "${SCRIPT_PATH}" != /* ]] && SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_PATH}"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+
+require_root
+load_env
+
+REAL_USER="${SUDO_USER:-${USER}}"
+VAULT_UUID="${VAULT_UUID:-}"
+VAULT_MOUNTPOINT="${VAULT_MOUNTPOINT:-/mnt/Vault}"
+VAULT_SUBDIR="${VAULT_SUBDIR:-recovery-toolkit-vault}"
+
+if [[ -z "${VAULT_UUID}" ]]; then
+  log_error "VAULT_UUID is empty; set it in .env before configuring the vault."
+  exit 1
+fi
+if [[ ! "${VAULT_UUID}" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]]; then
+  log_error "VAULT_UUID is not a valid filesystem UUID: ${VAULT_UUID}"
+  exit 1
+fi
+if [[ "${VAULT_MOUNTPOINT}" != /* || "${VAULT_MOUNTPOINT}" == */ ]]; then
+  log_error "VAULT_MOUNTPOINT must be an absolute directory path."
+  exit 1
+fi
+if [[ -z "${VAULT_SUBDIR}" || "${VAULT_SUBDIR}" == */* || "${VAULT_SUBDIR}" == . || "${VAULT_SUBDIR}" == .. ]]; then
+  log_error "VAULT_SUBDIR must be a single directory name."
+  exit 1
+fi
+
+vault_device="/dev/disk/by-uuid/${VAULT_UUID}"
+mount_unit="$(systemd-escape --path --suffix=mount "${VAULT_MOUNTPOINT}")"
+device_unit="$(systemd-escape --path "${vault_device}")"
+mount_unit_path="/etc/systemd/system/${mount_unit}"
+udev_rule="/etc/udev/rules.d/61-recovery-vault.rules"
+
+mkdir -p "${VAULT_MOUNTPOINT}"
+chmod 0750 "${VAULT_MOUNTPOINT}"
+
+if [[ -e "${vault_device}" ]]; then
+  vault_type="$(blkid -s TYPE -o value "${vault_device}" 2>/dev/null || true)"
+  if [[ "${vault_type}" != ext4 ]]; then
+    log_error "Vault UUID resolves to ${vault_type:-an unknown filesystem}, not ext4."
+    exit 1
+  fi
+  root_device="$(findmnt -no SOURCE /)"
+  if [[ "$(readlink -f "${vault_device}")" == "$(readlink -f "${root_device}")" ]]; then
+    log_error "Configured vault UUID resolves to the operating-system root device."
+    exit 1
+  fi
+else
+  log_warn "Vault device is not present; installing detection and waiting for unlock."
+fi
+
+cat > "${mount_unit_path}" <<EOF
+[Unit]
+Description=Recovery Toolkit encrypted vault
+BindsTo=${device_unit}.device
+After=${device_unit}.device
+
+[Mount]
+What=${vault_device}
+Where=${VAULT_MOUNTPOINT}
+Type=ext4
+Options=noatime,lazytime,nosuid,nodev
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > "${udev_rule}" <<EOF
+ACTION=="add|change", ENV{ID_FS_UUID}=="${VAULT_UUID}", ENV{SYSTEMD_WANTS}+="${mount_unit}"
+EOF
+
+systemctl daemon-reload
+udevadm control --reload-rules
+
+if [[ -e "${vault_device}" ]] && ! mountpoint -q "${VAULT_MOUNTPOINT}"; then
+  systemctl start "${mount_unit}"
+fi
+
+if mountpoint -q "${VAULT_MOUNTPOINT}"; then
+  vault_dir="${VAULT_MOUNTPOINT}/${VAULT_SUBDIR}"
+  install -d -m 0700 -o "${REAL_USER}" -g "$(id -gn "${REAL_USER}")" "${vault_dir}"
+  log_info "Vault mounted at ${VAULT_MOUNTPOINT}; toolkit directory: ${vault_dir}"
+else
+  log_info "Vault configuration installed; waiting for ${vault_device} to become available."
+fi

@@ -16,6 +16,17 @@ assert_contains "${repo_dir}/bin/setup-ssh" 'systemctl enable --now'
 assert_contains "${repo_dir}/bin/setup-tailscale" 'https://tailscale.com/install.sh'
 assert_contains "${repo_dir}/bin/setup-tailscale" 'tailscale up --qr=false --timeout=10s'
 assert_contains "${repo_dir}/bin/setup-tailscale" 'login'
+assert_contains "${repo_dir}/.env.example" 'VAULT_UUID=""'
+assert_contains "${repo_dir}/.env.example" 'VAULT_MOUNTPOINT="/mnt/Vault"'
+assert_contains "${repo_dir}/.env.example" 'VAULT_SUBDIR="recovery-toolkit-vault"'
+assert_contains "${repo_dir}/bin/setup-vault" 'systemd-escape --path --suffix=mount'
+assert_contains "${repo_dir}/bin/setup-vault" 'ID_FS_UUID'
+assert_contains "${repo_dir}/bin/setup-vault" 'BindsTo='
+assert_contains "${repo_dir}/bin/setup-vault" 'noatime,lazytime,nosuid,nodev'
+if grep -Fq '/etc/fstab' "${repo_dir}/bin/setup-vault"; then
+  echo "vault setup must not use fstab" >&2
+  exit 1
+fi
 assert_contains "${repo_dir}/README.md" "- \`setup-ssh\` - enables SSH and authorizes GitHub public keys"
 assert_contains "${repo_dir}/README.md" "- \`setup-tailscale\` - installs and authorizes Tailscale"
 assert_contains "${repo_dir}/bin/optimize-usb" 'backup_dir="/root/recovery-toolkit-optimization-'

@@ -59,6 +59,10 @@ package/database integrity.
 For persistent secrets and LUKS recovery material, use a separate
 hardware-encrypted USB vault. Keep it out of `/etc/fstab`, verify its stable
 identity before mounting, and mount it only for the operation that needs it.
+Configure its filesystem UUID in `.env` and run `sudo setup-vault`; after that,
+connecting and unlocking the matching vault automatically mounts it at
+`/mnt/Vault` and creates `/mnt/Vault/recovery-toolkit-vault` with private
+permissions.
 
 See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
 LUKS key/header storage and disk identification.
