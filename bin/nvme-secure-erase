@@ -1,27 +1,28 @@
-#!/usr/bin/env bash\
-#TODO Tie into common.sh and .env for USB UUID locking and recovery-toolkit path
+#!/usr/bin/env bash
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
 
 TARGET="${1:-}"
 
-if [[ -z "$TARGET" || "$TARGET" == "-h" || "$TARGET" == "--help" ]]; then
+if [[ -z "${TARGET}" || "${TARGET}" == "-h" || "${TARGET}" == "--help" ]]; then
   echo "Usage: sudo nvme-secure-erase /dev/nvmeXn1"
   echo "Issues a cryptographic scramble or user-data sanitize via nvme-cli."
   exit 1
 fi
 
-if [[ "$EUID" -ne 0 ]]; then
-  echo "Error: Must be run as root." >&2
-  exit 1
-fi
+require_root
+load_env
+assert_block_device "${TARGET}"
+assert_not_boot_disk "${TARGET}"
 
-echo "Targeting: $TARGET"
-sudo nvme id-ctrl "$TARGET" -H | grep -i sanitize || true
+log_info "Targeting: ${TARGET}"
+nvme id-ctrl "${TARGET}" -H | grep -i sanitize || true
 
-read -rp "Are you SURE you want to irreversibly sanitize $TARGET? (type 'DESTROY'): " CONFIRM
-if [[ "$CONFIRM" != "DESTROY" ]]; then
-  echo "Aborted."
-  exit 1
-fi
+confirm_destructive "${TARGET}"
 
-nvme format "$TARGET" --namespace-id=1 --ses=1
+log_info "Issuing crypto erase via nvme format..."
+nvme format "${TARGET}" --namespace-id=1 --ses=1
+log_info "Sanitize complete on ${TARGET}."

@@ -1,1 +1,45 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+
+TARGET="${1:-}"
+
+if [[ -z "${TARGET}" || "${TARGET}" == "-h" || "${TARGET}" == "--help" ]]; then
+  echo "Usage: sudo hdd-secure-erase /dev/sdX"
+  echo "Runs an ATA secure erase (falls back to a single-pass overwrite) on a rotational disk."
+  exit 1
+fi
+
+require_root
+load_env
+assert_block_device "${TARGET}"
+assert_not_boot_disk "${TARGET}"
+
+if [[ "$(is_rotational "${TARGET}")" != "1" ]]; then
+  log_warn "${TARGET} does not report as rotational. Consider ssd-secure-erase instead."
+fi
+
+log_info "Targeting: ${TARGET}"
+hdparm -I "${TARGET}" 2>/dev/null | grep -iA3 "Security:" || true
+
+confirm_destructive "${TARGET}"
+
+if hdparm -I "${TARGET}" 2>/dev/null | grep -qi "supported: enhanced erase"; then
+  log_info "Enhanced ATA secure erase supported. Setting temporary security password..."
+  hdparm --user-master u --security-set-pass RecoveryUSB "${TARGET}"
+  log_info "Issuing enhanced secure erase (this can take a while)..."
+  hdparm --user-master u --security-erase-enhanced RecoveryUSB "${TARGET}"
+elif hdparm -I "${TARGET}" 2>/dev/null | grep -qi "supported$"; then
+  log_info "Standard ATA secure erase supported. Setting temporary security password..."
+  hdparm --user-master u --security-set-pass RecoveryUSB "${TARGET}"
+  log_info "Issuing secure erase (this can take a while)..."
+  hdparm --user-master u --security-erase RecoveryUSB "${TARGET}"
+else
+  log_warn "ATA secure erase not supported/reported. Falling back to a single-pass overwrite."
+  shred -v -n 1 "${TARGET}"
+fi
+
+log_info "Secure erase complete on ${TARGET}."

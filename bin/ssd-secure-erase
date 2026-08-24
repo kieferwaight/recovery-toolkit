@@ -1,1 +1,43 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+
+TARGET="${1:-}"
+
+if [[ -z "${TARGET}" || "${TARGET}" == "-h" || "${TARGET}" == "--help" ]]; then
+  echo "Usage: sudo ssd-secure-erase /dev/sdX"
+  echo "Runs an ATA secure erase (falls back to blkdiscard --secure) on a SATA/flash disk."
+  exit 1
+fi
+
+require_root
+load_env
+assert_block_device "${TARGET}"
+assert_not_boot_disk "${TARGET}"
+
+if [[ "$(is_rotational "${TARGET}")" == "1" ]]; then
+  log_warn "${TARGET} reports as rotational. Consider hdd-secure-erase instead."
+fi
+
+log_info "Targeting: ${TARGET}"
+hdparm -I "${TARGET}" 2>/dev/null | grep -iA3 "Security:" || true
+
+confirm_destructive "${TARGET}"
+
+if hdparm -I "${TARGET}" 2>/dev/null | grep -qi "supported$"; then
+  log_info "ATA secure erase supported. Setting temporary security password..."
+  hdparm --user-master u --security-set-pass RecoveryUSB "${TARGET}"
+  log_info "Issuing secure erase..."
+  hdparm --user-master u --security-erase RecoveryUSB "${TARGET}"
+elif command -v blkdiscard >/dev/null 2>&1 && blkdiscard --secure --dry-run "${TARGET}" >/dev/null 2>&1; then
+  log_warn "ATA secure erase not supported. Falling back to blkdiscard --secure (TRIM-based)."
+  blkdiscard --secure "${TARGET}"
+else
+  log_warn "No secure erase method reported as supported. Falling back to a single-pass overwrite."
+  shred -v -n 1 "${TARGET}"
+fi
+
+log_info "Secure erase complete on ${TARGET}."

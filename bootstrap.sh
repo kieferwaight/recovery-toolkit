@@ -1,29 +1,52 @@
 #!/usr/bin/env bash
-# TODO: script that can be called with curl github.com/kieferwaight/recovery-toolkit ... bootstrap.sh | sh 
-# TODO: Ask for sudo access
+# Bootstraps a fresh Ubuntu install onto the recovery USB.
+# Intended to be run with: curl -fsSL https://raw.githubusercontent.com/kieferwaight/recovery-toolkit/main/bootstrap.sh | sudo bash
+set -euo pipefail
+
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "[-] bootstrap.sh must be run as root (re-run with sudo)." >&2
+  exit 1
+fi
+
+REPO_URL="https://github.com/kieferwaight/recovery-toolkit.git"
 export INSTALL_DIR="/opt/recovery-toolkit"
+REAL_USER="${SUDO_USER:-${USER}}"
+
+# Keep debconf from popping up keyboard-layout / service-restart prompts.
+export DEBIAN_FRONTEND=noninteractive
 
 # Update mirrors and grab core dev tools
-sudo apt-get update && sudo apt-get upgrade -y
-sudo apt-get install -y --no-install-recommends \
+apt-get update && apt-get upgrade -y
+apt-get install -y --no-install-recommends \
   git curl make tree jq shellcheck glow
-# TODO: Package configuration triggers UI that wants layout of keyboards. Should prevent
-# that from happning
 
 # Setup dir
-sudo mkdir -p ${INSTALL_DIR}
-sudo groupadd -r toolkit
-sudo usermod -aG toolkit ${USER}
-sudo chown -R root:toolkit ${INSTALL_DIR}
-sudo chmod -R u=rwX,g=rwX,o=rX ${INSTALL_DIR}
-sudo find ${INSTALL_DIR} -type d -exec chmod g+s {} +
+mkdir -p "${INSTALL_DIR}"
+groupadd -f -r toolkit
+usermod -aG toolkit "${REAL_USER}"
+chown -R root:toolkit "${INSTALL_DIR}"
+chmod -R u=rwX,g=rwX,o=rX "${INSTALL_DIR}"
+find "${INSTALL_DIR}" -type d -exec chmod g+s {} +
 
 # Configure Git
-git config --global user.name "Kiefer Waight"
-git config --global user.email "kwaight@users.noreply.github.com"
-git config --global init.defaultBranch main
-git config --global --add safe.directory /opt/rescue-toolkit
-git clone kieferwaight/recovery-usb ${INSTALL_DIR}
+sudo -u "${REAL_USER}" git config --global user.name "Kiefer Waight"
+sudo -u "${REAL_USER}" git config --global user.email "kwaight@users.noreply.github.com"
+sudo -u "${REAL_USER}" git config --global init.defaultBranch main
+git config --global --add safe.directory "${INSTALL_DIR}"
 
-# Generate .env , source, and then run Makefile for everything else.
-# Might need to run chmod +x on chmod +x packages/setup-packages.sh and bin stuff
+if [[ -d "${INSTALL_DIR}/.git" ]]; then
+  git -C "${INSTALL_DIR}" pull --ff-only
+else
+  git clone "${REPO_URL}" "${INSTALL_DIR}"
+fi
+chown -R root:toolkit "${INSTALL_DIR}"
+
+cd "${INSTALL_DIR}"
+
+# Generate .env from the example on first run, then make everything executable.
+if [[ ! -f .env && -f .env.example ]]; then
+  cp .env.example .env
+fi
+chmod +x bootstrap.sh packages/setup-packages.sh bin/*
+
+make all
