@@ -4,7 +4,7 @@ nvme-cli
 hdparm
 smartmontools
 gdisk
-wipefs
+util-linux
 parted
 dosfstools
 e2fsprogs
@@ -13,7 +13,7 @@ xfsprogs
 # Utilities & Imaging
 pv
 pigz
-ddrescue
+gddrescue
 testdisk
 lsof
 tree
