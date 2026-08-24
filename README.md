@@ -56,5 +56,9 @@ The optimizer also keeps APT lists in RAM and sets removable USB readahead to
 `data=writeback` or global unsafe dpkg I/O, preserving thermal protection and
 package/database integrity.
 
+For persistent secrets and LUKS recovery material, use a separate
+hardware-encrypted USB vault. Keep it out of `/etc/fstab`, verify its stable
+identity before mounting, and mount it only for the operation that needs it.
+
 See [docs/luks-layout-notes.md](docs/luks-layout-notes.md) for the plan around
 LUKS key/header storage and disk identification.
