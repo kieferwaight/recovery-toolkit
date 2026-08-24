@@ -1,6 +1,8 @@
-.PHONY: all packages symlinks env check test hooks
+.PHONY: all install packages symlinks env check test hooks
 
-all: env packages symlinks hooks
+all: install hooks
+
+install: env packages symlinks
 
 env:
 	@if [ ! -f .env ]; then \
@@ -15,10 +17,14 @@ symlinks:
 	@echo "==> Making bin/ scripts executable..."
 	@chmod +x bin/*
 	@echo "==> Symlinking executables into /usr/local/bin..."
-	@for script in bin/*; do \
+	@repo_dir="$$(pwd)"; \
+		sudo install -d -m 0755 /usr/local/bin; \
+		for script in bin/*; do \
 		if [ -f "$$script" ]; then \
-			sudo ln -sf "$$(pwd)/$$script" "/usr/local/bin/$$(basename $$script)"; \
-			echo "Linked: /usr/local/bin/$$(basename $$script)"; \
+			name="$$(basename "$$script")"; \
+			sudo ln -sfn "$$repo_dir/$$script" "/usr/local/bin/$$name"; \
+			test -L "/usr/local/bin/$$name" && [ "$$(readlink "/usr/local/bin/$$name")" = "$$repo_dir/$$script" ]; \
+			echo "Linked: /usr/local/bin/$$name"; \
 		fi \
 	done
 

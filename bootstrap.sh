@@ -35,6 +35,11 @@ sudo -u "${REAL_USER}" git config --global init.defaultBranch main
 git config --global --add safe.directory "${INSTALL_DIR}"
 
 if [[ -d "${INSTALL_DIR}/.git" ]]; then
+  if git -C "${INSTALL_DIR}" remote get-url origin >/dev/null 2>&1; then
+    git -C "${INSTALL_DIR}" remote set-url origin "${REPO_URL}"
+  else
+    git -C "${INSTALL_DIR}" remote add origin "${REPO_URL}"
+  fi
   git -C "${INSTALL_DIR}" pull --ff-only
 else
   git clone "${REPO_URL}" "${INSTALL_DIR}"
@@ -49,4 +54,4 @@ if [[ ! -f .env && -f .env.example ]]; then
 fi
 chmod +x bootstrap.sh packages/setup-packages.sh bin/*
 
-make all
+make install

@@ -5,9 +5,9 @@ After a fresh install of ubuntu on a portable usb, you can install the toolkit w
 curl -fsSL https://raw.githubusercontent.com/kieferwaight/recovery-toolkit/main/bootstrap.sh | sudo bash
 ```
 
-This sets up the bare minimum to load the repo and handoff to Makefile (`make all`),
-which installs packages, symlinks `bin/` into `/usr/local/bin`, and installs a
-shellcheck pre-commit hook.
+This loads the repo and runs `make install`, which installs packages and
+idempotently symlinks the `bin/` commands into `/usr/local/bin`. Run `make all`
+afterward if you also want the shellcheck pre-commit hook.
 
 ## Layout
 - `bin/` - toolkit executables (secure erase, USB tuning, overlay boot setup)
