@@ -32,11 +32,11 @@ FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
 log_info "1. Secure erase host system SSD"
 # ssd-secure-erase verifies that target is not current root and not vault.
 # It also detects the proper secure erase method.
-echo "NUKE" | sudo ssd-secure-erase "${TARGET_DISK}"
+echo "NUKE" | sudo -E ssd-secure-erase "${TARGET_DISK}"
 
 log_info "2. Prepare LUKS layout (first supported layout: GPT EFI + /boot + LUKS2 + LVM + XFS)"
 # Generates luks encryption key and stores it on vault implicitly.
-echo "${FINGERPRINT}" | sudo provision-luks --target "${TARGET_DISK}" --confirm
+echo "${FINGERPRINT}" | sudo -E provision-luks --target "${TARGET_DISK}" --confirm
 
 log_info "3. Generate SSH keypairs and store on vault"
 load_env
