@@ -160,6 +160,7 @@ config_sha256="$(sha256sum "${autoinstall_path}" | awk '{print $1}')"
 key_sha256="$(secret_sha256 "${runtime_key_file}")"
 
 set +e
+subiquity --autoinstall "${autoinstall_path}"
 command -v qemu-system-x86_64 >/dev/null || {
   apt-get update
   apt-get install -y qemu-system-x86 qemu-utils mtools xorriso
@@ -194,13 +195,19 @@ if [[ -z "${installer_iso}" ]]; then
   exit 1
 fi
 
+vmlinuz_path="${installer_root}/vmlinuz"
+initrd_path="${installer_root}/initrd"
+osirrox -indev "${installer_iso}" -extract /casper/vmlinuz "${vmlinuz_path}" -extract /casper/initrd "${initrd_path}" >/dev/null 2>&1
+
 log_info "Launching Subiquity Autoinstall in ephemeral QEMU VM (this may take 15-20 minutes)..."
 qemu-system-x86_64 -m 4096 -enable-kvm -nographic \
+  -kernel "${vmlinuz_path}" \
+  -initrd "${initrd_path}" \
+  -append "autoinstall console=ttyS0 ---" \
   -drive file="${TARGET_DISK}",format=raw,media=disk,if=virtio \
   -drive file="${installer_iso}",format=raw,readonly=on,media=cdrom \
   -drive file="${cidata_iso}",format=raw,readonly=on,media=cdrom \
-  -fw_cfg name=opt/luks-key,file="${runtime_key_file}" \
-  -boot d
+  -fw_cfg name=opt/luks-key,file="${runtime_key_file}"
 installer_status=$?
 set -e
 
