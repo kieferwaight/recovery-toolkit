@@ -14,6 +14,8 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "${SCRIPT_PATH}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=../lib/disk_identity.sh
+source "${SCRIPT_DIR}/../lib/disk_identity.sh"
 
 TARGET_DISK="${1:-/dev/sdb}"
 HOST_ID="$(hostname -s)"
@@ -24,14 +26,17 @@ if [[ ! -b "${TARGET_DISK}" ]]; then
   exit 1
 fi
 
+metadata="$(disk_identity "${TARGET_DISK}")"
+FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
+
 log_info "1. Secure erase host system SSD"
 # ssd-secure-erase verifies that target is not current root and not vault.
 # It also detects the proper secure erase method.
-sudo ssd-secure-erase "${TARGET_DISK}"
+echo "${FINGERPRINT}" | sudo ssd-secure-erase "${TARGET_DISK}"
 
 log_info "2. Prepare LUKS layout (first supported layout: GPT EFI + /boot + LUKS2 + LVM + XFS)"
 # Generates luks encryption key and stores it on vault implicitly.
-sudo provision-luks --target "${TARGET_DISK}" --confirm
+echo "${FINGERPRINT}" | sudo provision-luks --target "${TARGET_DISK}" --confirm
 
 log_info "3. Generate SSH keypairs and store on vault"
 load_env
@@ -70,7 +75,7 @@ UBUNTU_LUKS_KEY_FILE="$(find "${VAULT_ROOT}/hosts/${HOST_ID}/provisioning" -name
 export UBUNTU_LUKS_KEY_FILE
 
 log_info "4. Initiate installation of Ubuntu Server"
-sudo -E install-ubuntu-server --target "${TARGET_DISK}" --apply
+echo "${FINGERPRINT}" | sudo -E install-ubuntu-server --target "${TARGET_DISK}" --apply
 
 log_info "5. Decrypt and mount targets as per ubuntu install requirements"
 ROOT_VG="${ROOT_VG:-ubuntu-vg}"
@@ -104,7 +109,7 @@ RECOVERY_GATEWAY="$(ip route show default dev "${RECOVERY_INTERFACE}" | awk '{pr
 export RECOVERY_HOST_IP RECOVERY_SUBNET RECOVERY_GATEWAY
 export RECOVERY_SSH_PORT="2222"
 
-sudo -E setup-initramfs-unlock --target-root "${TARGET_ROOT}" --apply
+echo "${FINGERPRINT}" | sudo -E setup-initramfs-unlock --target-root "${TARGET_ROOT}" --apply
 
 log_info "7. Cleanup mounts and close volumes"
 for d in dev proc sys boot/efi boot; do
