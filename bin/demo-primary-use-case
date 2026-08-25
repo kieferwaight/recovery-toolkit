@@ -90,6 +90,8 @@ UBUNTU_LUKS_KEY_FILE="$(find "${VAULT_ROOT}/hosts/${HOST_ID}/provisioning" -name
 export UBUNTU_LUKS_KEY_FILE
 
 log_info "4. Initiate installation of Ubuntu Server"
+metadata="$(disk_identity "${TARGET_DISK}")"
+FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
 printf "NUKE\n%s\n" "${FINGERPRINT}" | install-ubuntu-server --target "${TARGET_DISK}" --apply
 
 log_info "5. Decrypt and mount targets as per ubuntu install requirements"
@@ -124,6 +126,8 @@ RECOVERY_GATEWAY="$(ip route show default dev "${RECOVERY_INTERFACE}" | awk '{pr
 export RECOVERY_HOST_IP RECOVERY_SUBNET RECOVERY_GATEWAY
 export RECOVERY_SSH_PORT="2222"
 
+metadata="$(disk_identity "${TARGET_DISK}")"
+FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
 echo "${FINGERPRINT}" | setup-initramfs-unlock --target-root "${TARGET_ROOT}" --apply
 
 log_info "7. Cleanup mounts and close volumes"
