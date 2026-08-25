@@ -29,12 +29,14 @@ fi
 
 # Ensure any existing LVM components on the target disk are deactivated
 # so wipefs can succeed.
+umount -R /mnt/target-slinky 2>/dev/null || true
 for lv in $(lvs --noheadings -o lv_path,vg_name | grep -E "ubuntu-vg-1|slinky-vg" | awk '{print $1}'); do
   lvchange -an "$lv" || true
 done
 for vg in $(vgs --noheadings -o vg_name | grep -E "ubuntu-vg-1|slinky-vg" | awk '{print $1}'); do
   vgchange -an "$vg" || true
 done
+cryptsetup close recovery-slinky-luks 2>/dev/null || true
 
 metadata="$(disk_identity "${TARGET_DISK}")"
 FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
