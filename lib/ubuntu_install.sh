@@ -171,6 +171,8 @@ ${crypt_partition_size}        preserve: true
         id: root-mount
         device: root-fs
         path: /
+  error-commands:
+    - cat /var/crash/*.crash
   shutdown: poweroff
 EOF
 }
