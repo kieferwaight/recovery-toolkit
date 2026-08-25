@@ -159,6 +159,7 @@ ${crypt_partition_size}        preserve: true
         id: root-lv
         name: $(_ubuntu_yaml_quote "${ROOT_LV}")
         volgroup: root-vg
+        size: -1
         preserve: true
       - type: format
         id: root-fs
