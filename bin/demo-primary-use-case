@@ -94,6 +94,8 @@ export UBUNTU_LUKS_KEY_FILE
 log_info "4. Initiate installation of Ubuntu Server"
 metadata="$(disk_identity "${TARGET_DISK}")"
 FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
+blockdev --flushbufs "${TARGET_DISK}" || true
+sync || true
 printf "NUKE\n%s\n" "${FINGERPRINT}" | install-ubuntu-server --target "${TARGET_DISK}" --apply
 
 log_info "5. Decrypt and mount targets as per ubuntu install requirements"

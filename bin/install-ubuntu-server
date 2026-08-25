@@ -204,7 +204,7 @@ qemu-system-x86_64 -m 4096 -enable-kvm -nographic \
   -kernel "${vmlinuz_path}" \
   -initrd "${initrd_path}" \
   -append "autoinstall console=ttyS0 ---" \
-  -drive file="${TARGET_DISK}",format=raw,media=disk,if=virtio \
+  -drive file="${TARGET_DISK}",format=raw,media=disk,if=virtio,cache=none \
   -drive file="${installer_iso}",format=raw,readonly=on,media=cdrom \
   -drive file="${cidata_iso}",format=raw,readonly=on,media=cdrom \
   -fw_cfg name=opt/luks-key,file="${runtime_key_file}"
