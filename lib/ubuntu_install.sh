@@ -101,7 +101,11 @@ autoinstall:
     - modprobe qemu_fw_cfg
     - udevadm settle
     - cat /sys/firmware/qemu_fw_cfg/by_name/opt/luks-key/raw > /tmp/luks.key
-    - cryptsetup open --type luks2 --keyfile-size 64 /dev/vda3 $(_ubuntu_yaml_quote "recovery-${HOST_ID}-luks") --key-file /tmp/luks.key
+    - "echo 'LUKS KEY SIZE:' $(wc -c < /tmp/luks.key) > /dev/console"
+    - "echo 'LUKS HEADER QEMU:' > /dev/console"
+    - "hexdump -C -n 128 /dev/vda3 > /dev/console"
+    - "hexdump -C /tmp/luks.key > /dev/console"
+    - cryptsetup open --type luks2 /dev/vda3 $(_ubuntu_yaml_quote "recovery-${HOST_ID}-luks") --key-file /tmp/luks.key
   storage:
     swap:
       size: 0
