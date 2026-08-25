@@ -99,7 +99,8 @@ autoinstall:
     - xfsprogs
   early-commands:
     - udevadm settle
-    - cryptsetup open /dev/vda3 $(_ubuntu_yaml_quote "recovery-${HOST_ID}-luks") --key-file /sys/firmware/qemu_fw_cfg/by_name/opt/luks-key/raw
+    - cat /sys/firmware/qemu_fw_cfg/by_name/opt/luks-key/raw > /tmp/luks.key
+    - cryptsetup open /dev/vda3 $(_ubuntu_yaml_quote "recovery-${HOST_ID}-luks") --key-file /tmp/luks.key
   storage:
     swap:
       size: 0
