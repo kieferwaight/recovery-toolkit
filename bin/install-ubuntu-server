@@ -69,8 +69,11 @@ if [[ -n "${vault_device}" && ( "${target_real}" == "${vault_device}" || ( -n "$
 fi
 
 source_squashfs="${UBUNTU_INSTALLER_SOURCE}/casper/filesystem.squashfs"
+if [[ ! -f "${source_squashfs}" ]]; then
+  source_squashfs="${UBUNTU_INSTALLER_SOURCE}/casper/ubuntu-server-minimal.squashfs"
+fi
 [[ -f "${source_squashfs}" ]] || {
-  log_error "Ubuntu installer source is missing ${source_squashfs}."
+  log_error "Ubuntu installer source is missing squashfs in ${UBUNTU_INSTALLER_SOURCE}/casper/."
   exit 1
 }
 vault_root="${VAULT_MOUNTPOINT:-/mnt/Vault}/${VAULT_SUBDIR:-recovery-toolkit-vault}"
