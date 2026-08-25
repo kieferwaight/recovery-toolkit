@@ -18,13 +18,23 @@ source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/disk_identity.sh"
 
 TARGET_DISK="${1:-/dev/sdb}"
-HOST_ID="$(hostname -s)"
-export HOST_ID
+export HOST_ID="slinky"
+export ROOT_VG="${HOST_ID}-vg"
+export ROOT_LV="root-lv"
 
 if [[ ! -b "${TARGET_DISK}" ]]; then
   log_error "Target ${TARGET_DISK} is not a block device."
   exit 1
 fi
+
+# Ensure any existing LVM components on the target disk are deactivated
+# so wipefs can succeed.
+for lv in $(lvs --noheadings -o lv_path,vg_name | grep -E "ubuntu-vg-1|slinky-vg" | awk '{print $1}'); do
+  lvchange -an "$lv" || true
+done
+for vg in $(vgs --noheadings -o vg_name | grep -E "ubuntu-vg-1|slinky-vg" | awk '{print $1}'); do
+  vgchange -an "$vg" || true
+done
 
 metadata="$(disk_identity "${TARGET_DISK}")"
 FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
