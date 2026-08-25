@@ -126,6 +126,8 @@ run_provision() {
   local luks_partition
   wipefs --all "${TARGET_DISK}" || return $?
   sgdisk --zap-all --clear "${TARGET_DISK}" || return $?
+  partprobe "${TARGET_DISK}" || true
+  udevadm settle || true
   sgdisk --new=1:0:+"${EFI_SIZE}" --typecode=1:ef00 --change-name=1:EFI "${TARGET_DISK}" || return $?
   sgdisk --new=2:0:+"${BOOT_SIZE}" --typecode=2:8300 --change-name=2:BOOT "${TARGET_DISK}" || return $?
   sgdisk --new=3:0:0 --typecode=3:8e00 --change-name=3:CRYPTROOT "${TARGET_DISK}" || return $?
