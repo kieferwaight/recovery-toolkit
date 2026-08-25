@@ -35,6 +35,11 @@ log_info "1. Secure erase host system SSD"
 echo "NUKE" | ssd-secure-erase "${TARGET_DISK}"
 
 log_info "2. Prepare LUKS layout (first supported layout: GPT EFI + /boot + LUKS2 + LVM + XFS)"
+# Deactivate stale LVM volumes that might be holding the device busy
+vgchange -an || true
+partprobe "${TARGET_DISK}" || true
+udevadm settle || true
+
 # Generates luks encryption key and stores it on vault implicitly.
 printf "NUKE\n%s\n" "${FINGERPRINT}" | provision-luks --target "${TARGET_DISK}" --confirm
 
