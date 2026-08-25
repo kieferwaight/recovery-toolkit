@@ -32,11 +32,11 @@ FINGERPRINT="$(disk_identity_fingerprint "${metadata}")"
 log_info "1. Secure erase host system SSD"
 # ssd-secure-erase verifies that target is not current root and not vault.
 # It also detects the proper secure erase method.
-echo "NUKE" | sudo -E ssd-secure-erase "${TARGET_DISK}"
+echo "NUKE" | ssd-secure-erase "${TARGET_DISK}"
 
 log_info "2. Prepare LUKS layout (first supported layout: GPT EFI + /boot + LUKS2 + LVM + XFS)"
 # Generates luks encryption key and stores it on vault implicitly.
-echo "${FINGERPRINT}" | sudo -E provision-luks --target "${TARGET_DISK}" --confirm
+echo "${FINGERPRINT}" | provision-luks --target "${TARGET_DISK}" --confirm
 
 log_info "3. Generate SSH keypairs and store on vault"
 load_env
@@ -75,7 +75,7 @@ UBUNTU_LUKS_KEY_FILE="$(find "${VAULT_ROOT}/hosts/${HOST_ID}/provisioning" -name
 export UBUNTU_LUKS_KEY_FILE
 
 log_info "4. Initiate installation of Ubuntu Server"
-echo "${FINGERPRINT}" | sudo -E install-ubuntu-server --target "${TARGET_DISK}" --apply
+echo "${FINGERPRINT}" | install-ubuntu-server --target "${TARGET_DISK}" --apply
 
 log_info "5. Decrypt and mount targets as per ubuntu install requirements"
 ROOT_VG="${ROOT_VG:-ubuntu-vg}"
@@ -88,16 +88,16 @@ EFI_PARTITION="$(lsblk -nrpo NAME,PARTN "${TARGET_DISK}" | awk '$2 == 1 { print 
 BOOT_PARTITION="$(lsblk -nrpo NAME,PARTN "${TARGET_DISK}" | awk '$2 == 2 { print $1; exit }')"
 LUKS_PARTITION="$(lsblk -nrpo NAME,PARTN "${TARGET_DISK}" | awk '$2 == 3 { print $1; exit }')"
 
-sudo cryptsetup open --key-file "${UBUNTU_LUKS_KEY_FILE}" "${LUKS_PARTITION}" "${MAPPER_NAME}"
-sudo vgchange -ay "${ROOT_VG}"
-sudo mkdir -p "${TARGET_ROOT}"
-sudo mount "/dev/${ROOT_VG}/${ROOT_LV}" "${TARGET_ROOT}"
-sudo mount "${BOOT_PARTITION}" "${TARGET_ROOT}/boot"
-sudo mount "${EFI_PARTITION}" "${TARGET_ROOT}/boot/efi"
+cryptsetup open --key-file "${UBUNTU_LUKS_KEY_FILE}" "${LUKS_PARTITION}" "${MAPPER_NAME}"
+vgchange -ay "${ROOT_VG}"
+mkdir -p "${TARGET_ROOT}"
+mount "/dev/${ROOT_VG}/${ROOT_LV}" "${TARGET_ROOT}"
+mount "${BOOT_PARTITION}" "${TARGET_ROOT}/boot"
+mount "${EFI_PARTITION}" "${TARGET_ROOT}/boot/efi"
 
 # Bind mounts required for chroot and initramfs update
 for d in dev proc sys; do
-  sudo mount --bind "/$d" "${TARGET_ROOT}/$d"
+  mount --bind "/$d" "${TARGET_ROOT}/$d"
 done
 
 log_info "6. Install dropbear on the target disk and rebuild initramfs"
@@ -109,14 +109,14 @@ RECOVERY_GATEWAY="$(ip route show default dev "${RECOVERY_INTERFACE}" | awk '{pr
 export RECOVERY_HOST_IP RECOVERY_SUBNET RECOVERY_GATEWAY
 export RECOVERY_SSH_PORT="2222"
 
-echo "${FINGERPRINT}" | sudo -E setup-initramfs-unlock --target-root "${TARGET_ROOT}" --apply
+echo "${FINGERPRINT}" | setup-initramfs-unlock --target-root "${TARGET_ROOT}" --apply
 
 log_info "7. Cleanup mounts and close volumes"
 for d in dev proc sys boot/efi boot; do
-  sudo umount "${TARGET_ROOT}/$d"
+  umount "${TARGET_ROOT}/$d"
 done
-sudo umount "${TARGET_ROOT}"
-sudo vgchange -an "${ROOT_VG}"
-sudo cryptsetup close "${MAPPER_NAME}"
+umount "${TARGET_ROOT}"
+vgchange -an "${ROOT_VG}"
+cryptsetup close "${MAPPER_NAME}"
 
 log_info "Smoke test passed. You can now try to reboot and remotely unlock using the SSH key saved on vault."
