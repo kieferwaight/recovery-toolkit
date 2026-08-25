@@ -36,7 +36,7 @@ echo "NUKE" | ssd-secure-erase "${TARGET_DISK}"
 
 log_info "2. Prepare LUKS layout (first supported layout: GPT EFI + /boot + LUKS2 + LVM + XFS)"
 # Generates luks encryption key and stores it on vault implicitly.
-echo "${FINGERPRINT}" | provision-luks --target "${TARGET_DISK}" --confirm
+printf "NUKE\n%s\n" "${FINGERPRINT}" | provision-luks --target "${TARGET_DISK}" --confirm
 
 log_info "3. Generate SSH keypairs and store on vault"
 load_env
@@ -75,7 +75,7 @@ UBUNTU_LUKS_KEY_FILE="$(find "${VAULT_ROOT}/hosts/${HOST_ID}/provisioning" -name
 export UBUNTU_LUKS_KEY_FILE
 
 log_info "4. Initiate installation of Ubuntu Server"
-echo "${FINGERPRINT}" | install-ubuntu-server --target "${TARGET_DISK}" --apply
+printf "NUKE\n%s\n" "${FINGERPRINT}" | install-ubuntu-server --target "${TARGET_DISK}" --apply
 
 log_info "5. Decrypt and mount targets as per ubuntu install requirements"
 ROOT_VG="${ROOT_VG:-ubuntu-vg}"
